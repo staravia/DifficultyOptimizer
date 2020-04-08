@@ -1,6 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DifficultyOptimizer", "DifficultyOptimizer\DifficultyOptimizer.csproj", "{5826503C-9A6A-44BA-A50E-7F352F50FC7C}"
+# Visual Studio 15
+VisualStudioVersion = 15.0.27703.2035
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DifficultyOptimizer", "DifficultyOptimizer.csproj", "{0FE14098-D9FA-4242-B22D-9749708DE946}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -8,9 +11,15 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{5826503C-9A6A-44BA-A50E-7F352F50FC7C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{5826503C-9A6A-44BA-A50E-7F352F50FC7C}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{5826503C-9A6A-44BA-A50E-7F352F50FC7C}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{5826503C-9A6A-44BA-A50E-7F352F50FC7C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0FE14098-D9FA-4242-B22D-9749708DE946}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0FE14098-D9FA-4242-B22D-9749708DE946}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0FE14098-D9FA-4242-B22D-9749708DE946}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0FE14098-D9FA-4242-B22D-9749708DE946}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {7186B165-2503-46F3-8E7C-67C7E08A11C2}
 	EndGlobalSection
 EndGlobal

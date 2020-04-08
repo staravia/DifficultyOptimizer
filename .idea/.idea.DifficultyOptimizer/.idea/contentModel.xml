@@ -2,25 +2,7 @@
 <project version="4">
   <component name="ContentModelStore">
     <e p="C:\Users\denys\.Rider2018.3\system\extResources" t="IncludeRecursive" />
-    <e p="C:\Users\denys\.Rider2018.3\system\resharper-host\local\Transient\ReSharperHost\v183\SolutionCaches\_DifficultyOptimizer.-2121150192.00" t="ExcludeRecursive" />
-    <e p="D:\Projects\DifficultyOptimizer" t="IncludeFlat">
-      <e p="DifficultyOptimizer" t="IncludeRecursive">
-        <e p="App.config" t="Include" />
-        <e p="App.xaml" t="Include" />
-        <e p="App.xaml.cs" t="Include" />
-        <e p="bin" t="ExcludeRecursive" />
-        <e p="DifficultyOptimizer.csproj" t="IncludeRecursive" />
-        <e p="MainWindow.xaml" t="Include" />
-        <e p="MainWindow.xaml.cs" t="Include" />
-        <e p="obj" t="ExcludeRecursive" />
-        <e p="Properties" t="Include">
-          <e p="AssemblyInfo.cs" t="Include" />
-          <e p="Resources.Designer.cs" t="Include" />
-          <e p="Resources.resx" t="Include" />
-        </e>
-      </e>
-      <e p="DifficultyOptimizer.sln" t="IncludeFlat" />
-      <e p="packages" t="ExcludeRecursive" />
-    </e>
+    <e p="C:\Users\denys\.Rider2018.3\system\resharper-host\local\Transient\ReSharperHost\v183\SolutionCaches\_DifficultyOptimizer.1969466571.00" t="ExcludeRecursive" />
+    <e p="D:\Projects\DifficultyOptimizer" t="IncludeFlat" />
   </component>
 </project>
