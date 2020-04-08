@@ -1,5 +1,10 @@
-﻿using DifficultyOptimizer.src;
+﻿using Accord.Math.Convergence;
+using Accord.Math.Optimization;
+using DifficultyOptimizer.src;
 using Newtonsoft.Json;
+using Quaver.API.Maps;
+using Quaver.API.Maps.Parsers;
+using Quaver.API.Maps.Processors.Difficulty.Rulesets.Keys;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -8,6 +13,7 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -69,9 +75,85 @@ namespace DifficultyOptimizer
 
         }
 
+        private StrainConstantsKeys Constants;
+        private List<MapData> MapData;
+
+        private CancellationTokenSource TokenSource;
+
+        private NelderMead Solver;
+
+        private int StepCount;
+
+
         private void ButtonOptimize_Click(object sender, EventArgs e)
         {
+            // Todo: Find a way to cancel the optimization while it is running
+            if (TokenSource != null)
+            {
+                TokenSource.Cancel();
+                TokenSource = null;
+                PrintToOutput("Optimization Cancelled.");
+                return;
+            }
 
+            // Update MapData List
+            var token = new CancellationTokenSource();
+            TokenSource = token;
+            MapData = ParseMapData(true);
+
+            if (MapData.Count == 0)
+            {
+                ErrorToOutput("Failed to parse map data.");
+                return;
+            }
+
+
+            Constants = new StrainConstantsKeys();
+            Solver = new NelderMead(Constants.ConstantVariables.Count, GetOptimizedValue);
+
+            for (var i = 0; i < Solver.LowerBounds.Length; i++)
+                Solver.LowerBounds[i] = 0;
+
+            Solver.Token = token.Token;
+            Solver.Convergence = new GeneralConvergence(Constants.ConstantVariables.Count)
+            {
+                Evaluations = 1,
+                MaximumEvaluations = 10000
+            };
+
+            Solver.Minimize();
+
+            foreach (var constant in Constants.ConstantVariables)
+                PrintToOutput(constant.GetVariableInfo());
+
+            PrintToOutput($"Done! Took {0f} seconds to compute!");
+        }
+
+        private double GetOptimizedValue(double[] input)
+        {
+            // Update Constants
+            for (var i = 0; i < input.Length; i++)
+                Constants.ConstantVariables[i].Value = (float)input[i];
+
+            // Solve Every Map's Difficulty
+            double total = 0;
+            double weight = 0;
+            foreach (var map in MapData)
+            {
+                var diff = map.Map.SolveDifficulty().OverallDifficulty;
+                var delta = Math.Pow(diff - map.TargetDifficulty, 2);
+
+                total += delta * map.Weight;
+                weight += map.Weight;
+            }
+
+            var value = total / weight;
+
+            PrintToOutput($"Current f(x) = {value}");
+
+            ProgressBar.Value = (int)(100 * StepCount / (float)Solver.Convergence.MaximumEvaluations);
+
+            return value;
         }
 
         private void ButtonSetDirectory_Click(object sender, EventArgs e)
@@ -209,15 +291,13 @@ namespace DifficultyOptimizer
                 var data = JsonConvert.DeserializeObject<JsonData>(file);
 
                 foreach (var map in data.Dataset)
-                {
                     ImportMapData(map.FilePath, map.TargetDifficulty, map.Weight);
-                }
 
                 var valid = ValidateData();
 
                 if (!valid)
                 {
-                    ErrorToOutput($"Dataset is invalid. Make sure you have set the correct map directory. Saved directory: {data.RootDirectory}");
+                    PrintToOutput($"Current Directory has been changed to: {CurrentDirectory}");
                     return;
                 }
 
@@ -244,14 +324,9 @@ namespace DifficultyOptimizer
                 return;
             }
 
-            var data = new List<MapData>();
+            var data = ParseMapData();
 
-            try
-            {
-                for (var row = 0; row < DataGrid.Rows.Count - 1; row++)
-                    data.Add(ConvertRowToData(row));
-            }
-            catch
+            if (data.Count == 0)
             {
                 ErrorToOutput("Export failed. Unable to parse the data.");
                 return;
@@ -278,12 +353,50 @@ namespace DifficultyOptimizer
             }
         }
 
-        private MapData ConvertRowToData(int row)
+        private MapData ConvertRowToData(int row, bool parseMap = false)
         {
-            var file = GetMapFilePath(row);
+            var file = parseMap ? AddRoot(GetMapFilePath(row)) : GetMapFilePath(row);
             var difficulty = float.Parse(DataGrid.Rows[row].Cells[2].Value.ToString());
-            var weight = float.Parse(DataGrid.Rows[row].Cells[2].Value.ToString());
-            return new MapData(file, difficulty, weight);
+            var weight = float.Parse(DataGrid.Rows[row].Cells[3].Value.ToString());
+            Qua map = null;
+
+            if (parseMap)
+            {
+                try
+                {
+                    if (file.EndsWith(".qua"))
+                        map = Qua.Parse(file);
+                    else if (file.EndsWith(".osu"))
+                        map = new OsuBeatmap(file).ToQua();
+
+                    PrintToOutput($"Map successfully parsed: {file}");
+                }
+                catch (Exception e)
+                {
+                    ErrorToOutput($"Error parsing map: {e.Message}");
+                }
+            }
+
+            return new MapData(file, difficulty, weight, map);
+        }
+
+        private List<MapData> ParseMapData(bool parseMap = false)
+        {
+            var data = new List<MapData>();
+
+            for (var row = 0; row < DataGrid.Rows.Count - 1; row++)
+            {
+                try
+                {
+                    data.Add(ConvertRowToData(row, parseMap));
+                }
+                catch
+                {
+                    // Ignored
+                }
+            }
+
+            return data;
         }
     }
 }

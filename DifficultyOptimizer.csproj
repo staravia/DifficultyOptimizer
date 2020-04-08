@@ -97,6 +97,12 @@
   <ItemGroup>
     <None Include="App.config" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="Quaver.API\Quaver.API\Quaver.API.csproj">
+      <Project>{33CFBA72-5FF0-4751-B927-2D66ECC85EB7}</Project>
+      <Name>Quaver.API</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="packages\Accord.3.8.2-alpha\build\Accord.targets" Condition="Exists('packages\Accord.3.8.2-alpha\build\Accord.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

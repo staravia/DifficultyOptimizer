@@ -41,7 +41,7 @@
             this.ButtonImportData = new System.Windows.Forms.Button();
             this.ButtonImportMap = new System.Windows.Forms.Button();
             this.ButtonSetDirectory = new System.Windows.Forms.Button();
-            this.progressBar1 = new System.Windows.Forms.ProgressBar();
+            this.ProgressBar = new System.Windows.Forms.ProgressBar();
             this.TextBoxOutput = new System.Windows.Forms.RichTextBox();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
@@ -142,7 +142,7 @@
             // 
             // splitContainer2.Panel2
             // 
-            this.splitContainer2.Panel2.Controls.Add(this.progressBar1);
+            this.splitContainer2.Panel2.Controls.Add(this.ProgressBar);
             this.splitContainer2.Panel2.Controls.Add(this.TextBoxOutput);
             this.splitContainer2.Panel2.Paint += new System.Windows.Forms.PaintEventHandler(this.splitContainer2_Panel2_Paint);
             this.splitContainer2.Size = new System.Drawing.Size(927, 198);
@@ -214,14 +214,16 @@
             this.ButtonSetDirectory.UseVisualStyleBackColor = true;
             this.ButtonSetDirectory.Click += new System.EventHandler(this.ButtonSetDirectory_Click);
             // 
-            // progressBar1
+            // ProgressBar
             // 
-            this.progressBar1.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
+            this.ProgressBar.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.progressBar1.Location = new System.Drawing.Point(3, 185);
-            this.progressBar1.Name = "progressBar1";
-            this.progressBar1.Size = new System.Drawing.Size(764, 10);
-            this.progressBar1.TabIndex = 1;
+            this.ProgressBar.Location = new System.Drawing.Point(3, 185);
+            this.ProgressBar.Name = "ProgressBar";
+            this.ProgressBar.Size = new System.Drawing.Size(764, 10);
+            this.ProgressBar.Step = 1;
+            this.ProgressBar.Style = System.Windows.Forms.ProgressBarStyle.Continuous;
+            this.ProgressBar.TabIndex = 1;
             // 
             // TextBoxOutput
             // 
@@ -265,7 +267,7 @@
         private System.Windows.Forms.SplitContainer splitContainer1;
         private System.Windows.Forms.SplitContainer splitContainer2;
         private System.Windows.Forms.RichTextBox TextBoxOutput;
-        private System.Windows.Forms.ProgressBar progressBar1;
+        private System.Windows.Forms.ProgressBar ProgressBar;
         private System.Windows.Forms.DataGridView DataGrid;
         private System.Windows.Forms.DataGridViewCheckBoxColumn Compute;
         private System.Windows.Forms.DataGridViewTextBoxColumn FilePath;
