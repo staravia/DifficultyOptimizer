@@ -43,6 +43,16 @@
             this.ButtonSetDirectory = new System.Windows.Forms.Button();
             this.ProgressBar = new System.Windows.Forms.ProgressBar();
             this.TextBoxOutput = new System.Windows.Forms.RichTextBox();
+            this.Tabs = new System.Windows.Forms.TabControl();
+            this.TabMaps = new System.Windows.Forms.TabPage();
+            this.TabVariables = new System.Windows.Forms.TabPage();
+            this.VariableGrid = new System.Windows.Forms.DataGridView();
+            this.VariableName = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.StartingValue = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.OptimizedValue = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Strength = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.MaxValue = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.MinValue = new System.Windows.Forms.DataGridViewTextBoxColumn();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
             this.splitContainer1.Panel2.SuspendLayout();
@@ -52,6 +62,10 @@
             this.splitContainer2.Panel1.SuspendLayout();
             this.splitContainer2.Panel2.SuspendLayout();
             this.splitContainer2.SuspendLayout();
+            this.Tabs.SuspendLayout();
+            this.TabMaps.SuspendLayout();
+            this.TabVariables.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.VariableGrid)).BeginInit();
             this.SuspendLayout();
             // 
             // splitContainer1
@@ -63,7 +77,7 @@
             // 
             // splitContainer1.Panel1
             // 
-            this.splitContainer1.Panel1.Controls.Add(this.DataGrid);
+            this.splitContainer1.Panel1.Controls.Add(this.Tabs);
             // 
             // splitContainer1.Panel2
             // 
@@ -74,6 +88,8 @@
             // 
             // DataGrid
             // 
+            this.DataGrid.AllowUserToResizeColumns = false;
+            this.DataGrid.AllowUserToResizeRows = false;
             this.DataGrid.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.AllCells;
             this.DataGrid.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             this.DataGrid.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
@@ -83,9 +99,9 @@
             this.Weight,
             this.Output});
             this.DataGrid.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.DataGrid.Location = new System.Drawing.Point(0, 0);
+            this.DataGrid.Location = new System.Drawing.Point(3, 3);
             this.DataGrid.Name = "DataGrid";
-            this.DataGrid.Size = new System.Drawing.Size(927, 455);
+            this.DataGrid.Size = new System.Drawing.Size(907, 417);
             this.DataGrid.TabIndex = 1;
             this.DataGrid.CellEndEdit += new System.Windows.Forms.DataGridViewCellEventHandler(this.dataGridView1_CellContentClick);
             // 
@@ -238,6 +254,104 @@
             this.TextBoxOutput.TabIndex = 0;
             this.TextBoxOutput.Text = "";
             // 
+            // Tabs
+            // 
+            this.Tabs.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.Tabs.Controls.Add(this.TabMaps);
+            this.Tabs.Controls.Add(this.TabVariables);
+            this.Tabs.Location = new System.Drawing.Point(3, 3);
+            this.Tabs.Name = "Tabs";
+            this.Tabs.SelectedIndex = 0;
+            this.Tabs.Size = new System.Drawing.Size(921, 449);
+            this.Tabs.TabIndex = 2;
+            // 
+            // TabMaps
+            // 
+            this.TabMaps.Controls.Add(this.DataGrid);
+            this.TabMaps.Location = new System.Drawing.Point(4, 22);
+            this.TabMaps.Name = "TabMaps";
+            this.TabMaps.Padding = new System.Windows.Forms.Padding(3);
+            this.TabMaps.Size = new System.Drawing.Size(913, 423);
+            this.TabMaps.TabIndex = 0;
+            this.TabMaps.Text = "Maps";
+            this.TabMaps.UseVisualStyleBackColor = true;
+            this.TabMaps.Click += new System.EventHandler(this.tabPage1_Click);
+            // 
+            // TabVariables
+            // 
+            this.TabVariables.Controls.Add(this.VariableGrid);
+            this.TabVariables.Location = new System.Drawing.Point(4, 22);
+            this.TabVariables.Name = "TabVariables";
+            this.TabVariables.Padding = new System.Windows.Forms.Padding(3);
+            this.TabVariables.Size = new System.Drawing.Size(913, 423);
+            this.TabVariables.TabIndex = 1;
+            this.TabVariables.Text = "Variables";
+            this.TabVariables.UseVisualStyleBackColor = true;
+            // 
+            // VariableGrid
+            // 
+            this.VariableGrid.AllowUserToResizeColumns = false;
+            this.VariableGrid.AllowUserToResizeRows = false;
+            this.VariableGrid.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            this.VariableGrid.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
+            this.VariableName,
+            this.StartingValue,
+            this.OptimizedValue,
+            this.Strength,
+            this.MaxValue,
+            this.MinValue});
+            this.VariableGrid.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.VariableGrid.Location = new System.Drawing.Point(3, 3);
+            this.VariableGrid.Name = "VariableGrid";
+            this.VariableGrid.Size = new System.Drawing.Size(907, 417);
+            this.VariableGrid.TabIndex = 0;
+            this.VariableGrid.CellContentClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.VariableGrid_CellContentClick);
+            // 
+            // VariableName
+            // 
+            this.VariableName.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
+            this.VariableName.HeaderText = "Variable Name";
+            this.VariableName.Name = "VariableName";
+            this.VariableName.ReadOnly = true;
+            // 
+            // StartingValue
+            // 
+            this.StartingValue.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.AllCells;
+            this.StartingValue.HeaderText = "Starting Value";
+            this.StartingValue.Name = "StartingValue";
+            this.StartingValue.Width = 98;
+            // 
+            // OptimizedValue
+            // 
+            this.OptimizedValue.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.AllCells;
+            this.OptimizedValue.HeaderText = "Optimized Value";
+            this.OptimizedValue.Name = "OptimizedValue";
+            this.OptimizedValue.ReadOnly = true;
+            this.OptimizedValue.Width = 99;
+            // 
+            // Strength
+            // 
+            this.Strength.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.AllCells;
+            this.Strength.HeaderText = "Strength";
+            this.Strength.Name = "Strength";
+            this.Strength.Width = 72;
+            // 
+            // MaxValue
+            // 
+            this.MaxValue.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.AllCells;
+            this.MaxValue.HeaderText = "Max Value";
+            this.MaxValue.Name = "MaxValue";
+            this.MaxValue.Width = 76;
+            // 
+            // MinValue
+            // 
+            this.MinValue.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.AllCells;
+            this.MinValue.HeaderText = "Min Value";
+            this.MinValue.Name = "MinValue";
+            this.MinValue.Width = 73;
+            // 
             // DifficultyOptimizerForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -258,6 +372,10 @@
             this.splitContainer2.Panel2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer2)).EndInit();
             this.splitContainer2.ResumeLayout(false);
+            this.Tabs.ResumeLayout(false);
+            this.TabMaps.ResumeLayout(false);
+            this.TabVariables.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.VariableGrid)).EndInit();
             this.ResumeLayout(false);
 
         }
@@ -279,6 +397,16 @@
         private System.Windows.Forms.Button ButtonImportData;
         private System.Windows.Forms.Button ButtonImportMap;
         private System.Windows.Forms.Button ButtonSetDirectory;
+        private System.Windows.Forms.TabControl Tabs;
+        private System.Windows.Forms.TabPage TabMaps;
+        private System.Windows.Forms.TabPage TabVariables;
+        private System.Windows.Forms.DataGridView VariableGrid;
+        private System.Windows.Forms.DataGridViewTextBoxColumn VariableName;
+        private System.Windows.Forms.DataGridViewTextBoxColumn StartingValue;
+        private System.Windows.Forms.DataGridViewTextBoxColumn OptimizedValue;
+        private System.Windows.Forms.DataGridViewTextBoxColumn Strength;
+        private System.Windows.Forms.DataGridViewTextBoxColumn MaxValue;
+        private System.Windows.Forms.DataGridViewTextBoxColumn MinValue;
     }
 }
 

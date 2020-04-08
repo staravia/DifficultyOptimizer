@@ -48,11 +48,18 @@ namespace DifficultyOptimizer
             FileBrowser.Filter = "Map File|*.osu;*.qua";
             InitializeComponent();
             PrintToOutput($"Please set your maps directory. \nCurrent directory: {CurrentDirectory}");
+
+            
+            Constants = new StrainConstantsKeys();
+            foreach (var constant in Constants.ConstantVariables)
+            {
+                ImportConstantData(constant.Name, constant.Value);
+            }
         }
 
         private void Form1_Load(object sender, EventArgs e)
         {
-
+            
         }
 
         private void splitContainer1_Panel2_Paint(object sender, PaintEventArgs e)
@@ -221,6 +228,17 @@ namespace DifficultyOptimizer
             {
                 ErrorToOutput($"Error importing selected map. Make sure you have the proper root directory set. Map: {file}");
             }
+        }
+
+        private void ImportConstantData(string name, float value, float strength = 1f, float max = 1000f, float min = 0)
+        {
+            var row = (DataGridViewRow)VariableGrid.Rows[0].Clone();
+            row.Cells[0].Value = name;
+            row.Cells[1].Value = value;
+            row.Cells[3].Value = strength;
+            row.Cells[4].Value = max;
+            row.Cells[5].Value = min;
+            VariableGrid.Rows.Add(row);
         }
 
         private bool ValidateData()
@@ -397,6 +415,16 @@ namespace DifficultyOptimizer
             }
 
             return data;
+        }
+
+        private void tabPage1_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void VariableGrid_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        {
+
         }
     }
 }
