@@ -98,8 +98,8 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="Quaver.API\Quaver.API\Quaver.API.csproj">
-      <Project>{33CFBA72-5FF0-4751-B927-2D66ECC85EB7}</Project>
+    <ProjectReference Include="Quaver.API-1\Quaver.API\Quaver.API.csproj">
+      <Project>{92870730-2220-419a-9cb5-52b460567718}</Project>
       <Name>Quaver.API</Name>
     </ProjectReference>
   </ItemGroup>

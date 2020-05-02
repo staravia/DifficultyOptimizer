@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -39,19 +40,28 @@ namespace DifficultyOptimizer
         private void DeleteRow(int row) => DataGrid.Rows.RemoveAt(row);
 
         private bool ValidateRow(int row) => File.Exists(AddRoot(GetMapFilePath(row)));
+        
+        private StrainConstantsKeys Constants;
+        private List<MapData> MapData;
+
+        private CancellationTokenSource TokenSource;
+
+        private NelderMead Solver;
+
+        private int StepCount;
 
         public DifficultyOptimizerForm()
         {
+            
             Optimizer = new Optimizer();
             CurrentDirectory = Directory.GetCurrentDirectory();
-            SetRootFolder(CurrentDirectory);
             FileBrowser.Multiselect = true;
             FileBrowser.Filter = "Map File|*.osu;*.qua";
+            SetRootFolder(CurrentDirectory);
             InitializeComponent();
 
             CheckForLocalJson();
 
-            
             Constants = new StrainConstantsKeys();
             foreach (var constant in Constants.ConstantVariables)
                 ImportConstantData(constant.Name, constant.Value);
@@ -119,15 +129,15 @@ namespace DifficultyOptimizer
 
         }
 
-        private StrainConstantsKeys Constants;
-        private List<MapData> MapData;
+        private double GetInputConstant(int index)
+        {
+            float val;
 
-        private CancellationTokenSource TokenSource;
+            if (float.TryParse(Convert.ToString(VariableGrid.Rows[index].Cells[1].Value), out val))
+                return val;
 
-        private NelderMead Solver;
-
-        private int StepCount;
-
+            return 0;
+        }
 
         private void ButtonOptimize_Click(object sender, EventArgs e)
         {
@@ -150,41 +160,73 @@ namespace DifficultyOptimizer
                 ErrorToOutput("Failed to parse map data.");
                 return;
             }
+            
+            // Initialize Input
+            var input = new double[Constants.ConstantVariables.Count];
 
+            for (var i = 0; i < Constants.ConstantVariables.Count; i++)
+                input[i] = GetInputConstant(i);
+            
+            // Create Stopwatch
+            var stopwatch = new Stopwatch();
+            stopwatch.Start();
 
-            Constants = new StrainConstantsKeys();
-            Solver = new NelderMead(Constants.ConstantVariables.Count, GetOptimizedValue);
-
-            for (var i = 0; i < Solver.LowerBounds.Length; i++)
-                Solver.LowerBounds[i] = 0.3f;
-
-            Solver.Token = token.Token;
-            Solver.Convergence = new GeneralConvergence(Constants.ConstantVariables.Count)
+            // Create Nelder Mead Solver
+            Solver = new NelderMead(Constants.ConstantVariables.Count, GetOptimizedValue)
             {
-                Evaluations = 1,
-                MaximumEvaluations = 10000
+                Token = token.Token,
+                Solution = input,
+                Convergence = new GeneralConvergence(Constants.ConstantVariables.Count)
+                {
+                    Evaluations = 1, MaximumEvaluations = 10000
+                }
             };
 
+            // Set Lower bounds
+            for (var i = 0; i < Solver.LowerBounds.Length; i++)
+            {
+                float val;
+
+                if (float.TryParse(Convert.ToString(VariableGrid.Rows[i].Cells[5].Value), out val))
+                    Solver.LowerBounds[i] = val;
+            }
+            
+            // Set Upper bounds
+            for (var i = 0; i < Solver.LowerBounds.Length; i++)
+            {
+                float val;
+
+                if (float.TryParse(Convert.ToString(VariableGrid.Rows[i].Cells[4].Value), out val))
+                    Solver.UpperBounds[i] = val;
+            }
+
+            // Solve
             Solver.Minimize();
 
-            foreach (var constant in Constants.ConstantVariables)
-                PrintToOutput(constant.GetVariableInfo());
+            // Finish Solving
+            stopwatch.Stop();
+            PrintToOutput($"Done! Took {stopwatch.Elapsed.TotalSeconds} seconds to compute!");
 
-            PrintToOutput($"Done! Took {0f} seconds to compute!");
+            for (var i = 0; i < Solver.Solution.Length; i++)
+                UpdateConstantData(i, (float)Solver.Solution[i]);
+
+            for (var i = 0; i < MapData.Count; i++)
+            {
+                UpdaateMapOutput(i, MapData[i].Map.SolveDifficulty(ModIdentifier.None, Constants).OverallDifficulty);
+            }
         }
 
         private double GetOptimizedValue(double[] input)
         {
-            // Update Constants
-            for (var i = 0; i < input.Length; i++)
-                Constants.ConstantVariables[i].Value = (float)input[i];
+            float[] inputf = Array.ConvertAll(input, x => (float)x);
+            Constants = new StrainConstantsKeys(inputf);
 
             // Solve Every Map's Difficulty
             double total = 0;
             double weight = 0;
             foreach (var map in MapData)
             {
-                var diff = map.Map.SolveDifficulty(new StrainConstantsKeys(Constants)).OverallDifficulty;
+                var diff = map.Map.SolveDifficulty(ModIdentifier.None, Constants).OverallDifficulty;
                 var delta = Math.Pow(diff - map.TargetDifficulty, 2);
 
                 total += delta * map.Weight;
@@ -268,16 +310,21 @@ namespace DifficultyOptimizer
             }
         }
 
-        private void ImportConstantData(string name, float value, float strength = 1f, float max = 1000f, float min = 0)
+        private void UpdaateMapOutput(int index, float diff) => DataGrid.Rows[index].Cells[4].Value = diff;
+
+        private void ImportConstantData(string name, float value, bool optimize = true, float max = 1000f, float min = 0)
         {
             var row = (DataGridViewRow)VariableGrid.Rows[0].Clone();
             row.Cells[0].Value = name;
             row.Cells[1].Value = value;
-            row.Cells[3].Value = strength;
+            row.Cells[3].Value = optimize;
             row.Cells[4].Value = max;
             row.Cells[5].Value = min;
             VariableGrid.Rows.Add(row);
         }
+
+        private void UpdateConstantData(int index, float output) =>
+            VariableGrid.Rows[index].Cells[2].Value = output;
 
         private bool ValidateData()
         {
