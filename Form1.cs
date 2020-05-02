@@ -175,10 +175,11 @@ namespace DifficultyOptimizer
             Solver = new NelderMead(Constants.ConstantVariables.Count, GetOptimizedValue)
             {
                 Token = token.Token,
-                Solution = input,
+                
                 Convergence = new GeneralConvergence(Constants.ConstantVariables.Count)
                 {
-                    Evaluations = 1, MaximumEvaluations = 10000
+                    Evaluations = 0, 
+                    MaximumEvaluations = 100000
                 }
             };
 
@@ -201,7 +202,7 @@ namespace DifficultyOptimizer
             }
 
             // Solve
-            Solver.Minimize();
+            Solver.Minimize(input);
 
             // Finish Solving
             stopwatch.Stop();
@@ -220,6 +221,7 @@ namespace DifficultyOptimizer
         {
             float[] inputf = Array.ConvertAll(input, x => (float)x);
             Constants = new StrainConstantsKeys(inputf);
+            PrintToOutput($"a= {inputf[0]}");
 
             // Solve Every Map's Difficulty
             double total = 0;
@@ -227,7 +229,7 @@ namespace DifficultyOptimizer
             foreach (var map in MapData)
             {
                 var diff = map.Map.SolveDifficulty(ModIdentifier.None, Constants).OverallDifficulty;
-                var delta = Math.Pow(diff - map.TargetDifficulty, 2);
+                var delta = Math.Pow(10f * (diff - map.TargetDifficulty), 2);
 
                 total += delta * map.Weight;
                 weight += map.Weight;
