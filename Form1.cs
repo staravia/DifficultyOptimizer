@@ -2,6 +2,7 @@
 using Accord.Math.Optimization;
 using DifficultyOptimizer.src;
 using Newtonsoft.Json;
+using Quaver.API.Enums;
 using Quaver.API.Maps;
 using Quaver.API.Maps.Parsers;
 using Quaver.API.Maps.Processors.Difficulty.Rulesets.Keys;
@@ -47,14 +48,50 @@ namespace DifficultyOptimizer
             FileBrowser.Multiselect = true;
             FileBrowser.Filter = "Map File|*.osu;*.qua";
             InitializeComponent();
-            PrintToOutput($"Please set your maps directory. \nCurrent directory: {CurrentDirectory}");
+
+            CheckForLocalJson();
 
             
             Constants = new StrainConstantsKeys();
             foreach (var constant in Constants.ConstantVariables)
-            {
                 ImportConstantData(constant.Name, constant.Value);
+
+            VariableGrid.AllowUserToAddRows = false;
+            VariableGrid.AllowUserToDeleteRows = false;
+        }
+
+        private void CheckForLocalJson()
+        {
+            var path = $"{CurrentDirectory}\\DifficultyData.json";
+
+            PrintToOutput($"Searching for local DifficultyData.json file: {path}");
+
+            if (File.Exists(path))
+            {
+                try
+                {
+
+                    var file = File.ReadAllText(path);
+                    var data = JsonConvert.DeserializeObject<JsonData>(file);
+
+                    if (!Directory.Exists(data.RootDirectory))
+                    {
+                        ErrorToOutput($"Local DifficultyData.json found, but Directory does not exist: {data.RootDirectory}");
+                        PrintToOutput($"If you are importing this data from another machine, please set the maps directory.");
+                        return;
+                    }
+
+                    SetRootFolder(data.RootDirectory);
+                    ImportMaps(data);
+                }
+                catch
+                {
+                    ErrorToOutput($"Failed to parse local DifficultyData.json file");
+                }
+                return;
             }
+
+            PrintToOutput($"DifficultyData.json does not exist. Please set your maps directory before importing maps or datasets. \nCurrent directory: {CurrentDirectory}");
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -119,7 +156,7 @@ namespace DifficultyOptimizer
             Solver = new NelderMead(Constants.ConstantVariables.Count, GetOptimizedValue);
 
             for (var i = 0; i < Solver.LowerBounds.Length; i++)
-                Solver.LowerBounds[i] = 0;
+                Solver.LowerBounds[i] = 0.3f;
 
             Solver.Token = token.Token;
             Solver.Convergence = new GeneralConvergence(Constants.ConstantVariables.Count)
@@ -147,12 +184,13 @@ namespace DifficultyOptimizer
             double weight = 0;
             foreach (var map in MapData)
             {
-                var diff = map.Map.SolveDifficulty().OverallDifficulty;
+                var diff = map.Map.SolveDifficulty(new StrainConstantsKeys(Constants)).OverallDifficulty;
                 var delta = Math.Pow(diff - map.TargetDifficulty, 2);
 
                 total += delta * map.Weight;
                 weight += map.Weight;
             }
+
 
             var value = total / weight;
 
@@ -177,7 +215,7 @@ namespace DifficultyOptimizer
 
         private void SetRootFolder(string root)
         {
-            RootFolder = FolderBrowser.SelectedPath;
+            RootFolder = root;
             FileBrowser.InitialDirectory = RootFolder;
         }
 
@@ -302,29 +340,32 @@ namespace DifficultyOptimizer
             try
             {
                 var file = File.ReadAllText(browser.FileName);
-
-                PrintToOutput(file);
                 ClearTable();
 
                 var data = JsonConvert.DeserializeObject<JsonData>(file);
-
-                foreach (var map in data.Dataset)
-                    ImportMapData(map.FilePath, map.TargetDifficulty, map.Weight);
-
-                var valid = ValidateData();
-
-                if (!valid)
-                {
-                    PrintToOutput($"Current Directory has been changed to: {CurrentDirectory}");
-                    return;
-                }
-
-                PrintToOutput("Import succeeded.");
+                ImportMaps(data);
             }
             catch
             {
                 ErrorToOutput("Import Failed. Failed to deserialize file.");
             }
+        }
+
+        private void ImportMaps(JsonData data)
+        {
+            foreach (var map in data.Dataset)
+                ImportMapData(map.FilePath, map.TargetDifficulty, map.Weight);
+
+            var valid = ValidateData();
+
+            if (!valid)
+            {
+                ErrorToOutput("Import Failed. Failed to find a single file path. Make sure that the maps directory is set.");
+                PrintToOutput($"Current Directory has been changed to: {CurrentDirectory}");
+                return;
+            }
+
+            PrintToOutput("Import succeeded.");
         }
 
         private void ClearTable()
