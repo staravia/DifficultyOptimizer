@@ -14,6 +14,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -26,8 +27,6 @@ namespace DifficultyOptimizer
         private string RootFolder { get; set; }
 
         private string CurrentDirectory { get; set; }
-
-        private Optimizer Optimizer;
 
         private OpenFileDialog FileBrowser = new OpenFileDialog();
 
@@ -49,11 +48,10 @@ namespace DifficultyOptimizer
         private NelderMead Solver;
 
         private int StepCount;
+        private event EventHandler<string> OptimizeStepComplete;
 
         public DifficultyOptimizerForm()
         {
-            
-            Optimizer = new Optimizer();
             CurrentDirectory = Directory.GetCurrentDirectory();
             FileBrowser.Multiselect = true;
             FileBrowser.Filter = "Map File|*.osu;*.qua";
@@ -68,6 +66,7 @@ namespace DifficultyOptimizer
 
             VariableGrid.AllowUserToAddRows = false;
             VariableGrid.AllowUserToDeleteRows = false;
+            OptimizeStepComplete += OnOptimizeStepComplete;
         }
 
         private void CheckForLocalJson()
@@ -133,7 +132,7 @@ namespace DifficultyOptimizer
         {
             float val;
 
-            if (float.TryParse(Convert.ToString(VariableGrid.Rows[index].Cells[1].Value), out val))
+            if (float.TryParse(Convert.ToString(VariableGrid.Rows[index].Cells[2].Value), out val))
                 return val;
 
             return 0;
@@ -145,14 +144,19 @@ namespace DifficultyOptimizer
             if (TokenSource != null)
             {
                 TokenSource.Cancel();
-                TokenSource = null;
-                PrintToOutput("Optimization Cancelled.");
                 return;
             }
 
+            HandleOptimization();
+        }
+
+        private async Task HandleOptimization()
+        {
+            // Clear the output so it doesn't get clogged up.
+            ClearOutput();
+            
             // Update MapData List
-            var token = new CancellationTokenSource();
-            TokenSource = token;
+            TokenSource = new CancellationTokenSource();
             MapData = ParseMapData(true);
 
             if (MapData.Count == 0)
@@ -174,7 +178,7 @@ namespace DifficultyOptimizer
             // Create Nelder Mead Solver
             Solver = new NelderMead(Constants.ConstantVariables.Count, GetOptimizedValue)
             {
-                Token = token.Token,
+                Token = TokenSource.Token,
                 
                 Convergence = new GeneralConvergence(Constants.ConstantVariables.Count)
                 {
@@ -202,30 +206,43 @@ namespace DifficultyOptimizer
             }
 
             // Solve
-            Solver.Minimize(input);
-
-            // Finish Solving
-            stopwatch.Stop();
-            PrintToOutput($"Done! Took {stopwatch.Elapsed.TotalSeconds} seconds to compute!");
-
-            for (var i = 0; i < Solver.Solution.Length; i++)
-                UpdateConstantData(i, (float)Solver.Solution[i]);
-
-            for (var i = 0; i < MapData.Count; i++)
+            try
             {
-                UpdaateMapOutput(i, MapData[i].Map.SolveDifficulty(ModIdentifier.None, Constants).OverallDifficulty);
+                Action<Task> action = delegate { HandleOptimizeCompleted(stopwatch); };
+                var task = Task.Run(() => Solver.Minimize(input), TokenSource.Token)
+                    .ContinueWith(action, TokenSource.Token);
+
+                await task;
+
+                TokenSource.Token.ThrowIfCancellationRequested();
+            }
+            catch (OperationCanceledException)
+            {
+                PrintToOutput("Optimization Cancelled.");
+                TokenSource.Dispose();
+            }
+            finally
+            {
+                TokenSource = null;
             }
         }
 
+        /// <summary>
+        /// </summary>
+        /// <param name="input"></param>
+        /// <returns></returns>
         private double GetOptimizedValue(double[] input)
         {
+            if (TokenSource.IsCancellationRequested)
+                return 0;
+            
             float[] inputf = Array.ConvertAll(input, x => (float)x);
-            Constants = new StrainConstantsKeys(inputf);
-            PrintToOutput($"a= {inputf[0]}");
-
-            // Solve Every Map's Difficulty
             double total = 0;
             double weight = 0;
+            
+            Constants = new StrainConstantsKeys(inputf);
+            
+            // Solve Every Map's Difficulty
             foreach (var map in MapData)
             {
                 var diff = map.Map.SolveDifficulty(ModIdentifier.None, Constants).OverallDifficulty;
@@ -235,21 +252,49 @@ namespace DifficultyOptimizer
                 weight += map.Weight;
             }
 
-
             var value = total / weight;
 
-            PrintToOutput($"Current f(x) = {value}");
-
-            ProgressBar.Value = (int)(100 * StepCount / (float)Solver.Convergence.MaximumEvaluations);
+            OptimizeStepComplete?.Invoke(this, $"Current f(x) = {value}");
 
             return value;
         }
 
+        /// <summary>
+        /// </summary>
+        /// <param name="stopwatch"></param>
+        private void HandleOptimizeCompleted(Stopwatch stopwatch)
+        {
+            TokenSource.Dispose();
+            TokenSource = null;
+            stopwatch.Stop();
+            PrintToOutput($"Done! Took {stopwatch.Elapsed.TotalSeconds} seconds to compute!");
+
+            for (var i = 0; i < Solver.Solution.Length; i++)
+                UpdateConstantData(i, (float)Solver.Solution[i]);
+
+            for (var i = 0; i < MapData.Count; i++)
+                UpdaateMapOutput(i, MapData[i].Map.SolveDifficulty(ModIdentifier.None, Constants).OverallDifficulty);
+        }
+
+        /// <summary>
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="output"></param>
+        private void OnOptimizeStepComplete(object sender, string output)
+        {
+            PrintToOutput(output);
+            ProgressBar.Value = (int)(100 * StepCount / (float)Solver.Convergence.MaximumEvaluations);
+        }
+
+        /// <summary>
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void ButtonSetDirectory_Click(object sender, EventArgs e)
         {
             if (FolderBrowser.ShowDialog() != DialogResult.OK)
             {
-                ErrorToOutput("Error setting the root directory for maps.");
+                ErrorToOutput("Cancelled Root Directory setup");
                 return;
             }
 
@@ -257,32 +302,76 @@ namespace DifficultyOptimizer
             SetRootFolder(FolderBrowser.SelectedPath);
         }
 
+        /// <summary>
+        /// </summary>
+        /// <param name="root"></param>
         private void SetRootFolder(string root)
         {
             RootFolder = root;
             FileBrowser.InitialDirectory = RootFolder;
         }
 
+        /// <summary>
+        /// </summary>
         private void ClearOutput() => TextBoxOutput.Clear();
 
+        /// <summary>
+        /// </summary>
+        /// <param name="output"></param>
         private void PrintToOutput(string output)
         {
             TextBoxOutput.AppendText($"{output}\n");
             TextBoxOutput.ScrollToCaret();
         }
 
+        /// <summary>
+        /// </summary>
+        /// <param name="output"></param>
         private void ErrorToOutput(string output)
         {
             TextBoxOutput.SelectionColor = Color.Red;
             TextBoxOutput.AppendText($"{output}\n");
             TextBoxOutput.ScrollToCaret();
         }
+        
+        private void ImportMapData(string file, float diff = 1f, float weight = 0.5f)
+        {
+            try
+            {
+                var row = (DataGridViewRow)DataGrid.Rows[0].Clone();
+                
+                row.Cells[0].Value = true;
+                row.Cells[1].Value = RemoveRoot(file);
+                row.Cells[2].Value = diff;
+                row.Cells[3].Value = weight;
+                DataGrid.Rows.Add(row);
+                
+                PrintToOutput($"Map Imported: {file}");
+            }
+            catch
+            {
+                ErrorToOutput($"Error importing selected map. Make sure you have the proper root directory set. Map: {file}");
+            }
+        }
+        
+        private void UpdaateMapOutput(int index, float diff) => DataGrid.Rows[index].Cells[4].Value = diff;
+
+        private void ImportConstantData(string name, float value, bool optimize = true, float max = 1000f, float min = 0)
+        {
+            var row = (DataGridViewRow)VariableGrid.Rows[0].Clone();
+            row.Cells[1].Value = name;
+            row.Cells[2].Value = value;
+            row.Cells[0].Value = optimize;
+            row.Cells[4].Value = max;
+            row.Cells[5].Value = min;
+            VariableGrid.Rows.Add(row);
+        }
 
         private void ButtonImportMap_Click(object sender, EventArgs e)
         {
             if (FileBrowser.ShowDialog() != DialogResult.OK || !FileBrowser.CheckFileExists)
             {
-                ErrorToOutput("Error importing selected map.");
+                ErrorToOutput("Maps Import Cancelled.");
                 return;
             }
 
@@ -292,41 +381,9 @@ namespace DifficultyOptimizer
             }
         }
 
-        private void ImportMapData(string file, float diff = 1f, float weight = 0.5f)
-        {
-            try
-            {
-                Optimizer.AddMapData(file, diff, weight);
-
-                var row = (DataGridViewRow)DataGrid.Rows[0].Clone();
-                row.Cells[0].Value = true;
-                row.Cells[1].Value = RemoveRoot(file);
-                row.Cells[2].Value = diff;
-                row.Cells[3].Value = weight;
-                DataGrid.Rows.Add(row);
-                PrintToOutput($"Map Imported: {file}");
-            }
-            catch
-            {
-                ErrorToOutput($"Error importing selected map. Make sure you have the proper root directory set. Map: {file}");
-            }
-        }
-
-        private void UpdaateMapOutput(int index, float diff) => DataGrid.Rows[index].Cells[4].Value = diff;
-
-        private void ImportConstantData(string name, float value, bool optimize = true, float max = 1000f, float min = 0)
-        {
-            var row = (DataGridViewRow)VariableGrid.Rows[0].Clone();
-            row.Cells[0].Value = name;
-            row.Cells[1].Value = value;
-            row.Cells[3].Value = optimize;
-            row.Cells[4].Value = max;
-            row.Cells[5].Value = min;
-            VariableGrid.Rows.Add(row);
-        }
 
         private void UpdateConstantData(int index, float output) =>
-            VariableGrid.Rows[index].Cells[2].Value = output;
+            VariableGrid.Rows[index].Cells[3].Value = output;
 
         private bool ValidateData()
         {
@@ -515,6 +572,11 @@ namespace DifficultyOptimizer
         private void VariableGrid_CellContentClick(object sender, DataGridViewCellEventArgs e)
         {
 
+        }
+
+        private void ButtonCalculate_Click(object sender, EventArgs e)
+        {
+            //asd
         }
     }
 }
