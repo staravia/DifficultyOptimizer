@@ -33,12 +33,12 @@ namespace DifficultyOptimizer
         /// <summary>
         /// Used to import files.
         /// </summary>
-        private OpenFileDialog FileBrowser = new OpenFileDialog();
+        private readonly OpenFileDialog FileBrowser = new OpenFileDialog();
 
         /// <summary>
         /// Used to reference the current directory.
         /// </summary>
-        private FolderBrowserDialog FolderBrowser = new FolderBrowserDialog();
+        private readonly FolderBrowserDialog FolderBrowser = new FolderBrowserDialog();
 
         /// <summary>
         /// Reference to the current constant variables.
@@ -137,8 +137,8 @@ namespace DifficultyOptimizer
             // Initialize UI/data
             SetRootFolder(CurrentDirectory);
             InitializeComponent();
-            CheckForLocalMapData();
             InitializeConstants();
+            CheckForLocalMapData();
             OptimizeStepComplete += OnOptimizeStepComplete;
             
             // Initialize ActiveConstants
@@ -189,6 +189,7 @@ namespace DifficultyOptimizer
 
                 SetRootFolder(data.RootDirectory);
                 ImportMaps(data);
+                ImportConstants(data);
             }
             catch
             {
@@ -197,7 +198,43 @@ namespace DifficultyOptimizer
         }
 
         /// <summary>
-        /// 
+        /// Imports all the constant data that is saved.
+        /// </summary>
+        /// <param name="data"></param>
+        private void ImportConstants(JsonData data)
+        {
+            try
+            {
+                if (data.Constants.Length != Constants.ConstantVariables.Count)
+                {
+                    ErrorToOutput("Total number of variables from DifficultyData.json does not match total constants in the current difficulty solver.");
+                    return;
+                }
+
+                var dialogResult = MessageBox.Show("Do you want to use your previously saved constants?", "Difficulty Optimizer", MessageBoxButtons.YesNo);
+
+                switch (dialogResult)
+                {
+                    case DialogResult.Yes:
+                        for (var i = 0; i < data.Constants.Length; i++)
+                            VariableGrid.Rows[i].Cells[2].Value = data.Constants[i];
+                        
+                        PrintToOutput("Successfully loaded saved constants. Using saved constants.");
+                        return;
+                    case DialogResult.No:
+                        ErrorToOutput("Using default constants instead of saved constants. When saving, you will overwrite the previous file! Make sure you have a backup if needed.");
+                        
+                        return;
+                }
+            }
+            catch
+            {
+                ErrorToOutput("Failed to import saved constants. Using default values.");
+            }
+        }
+
+        /// <summary>
+        /// This will prepare the optimizer.
         /// </summary>
         /// <returns></returns>
         private async Task HandleOptimization()
@@ -260,9 +297,7 @@ namespace DifficultyOptimizer
         /// <returns></returns>
         private double GetConstantFromInput(int index)
         {
-            float val;
-
-            if (float.TryParse(Convert.ToString(VariableGrid.Rows[index].Cells[2].Value), out val))
+            if (float.TryParse(Convert.ToString(VariableGrid.Rows[index].Cells[2].Value), out var val))
                 return val;
 
             return 0;
@@ -353,7 +388,7 @@ namespace DifficultyOptimizer
                 Convergence = new GeneralConvergence(count)
                 {
                     Evaluations = 0, 
-                    MaximumEvaluations = 1000
+                    MaximumEvaluations = 700
                 },
                 
                 Token = TokenSource.Token
@@ -372,14 +407,11 @@ namespace DifficultyOptimizer
             {
                 if (!ActiveConstants[i])
                     continue;
-                
-                float min;
-                float max;
 
-                if (float.TryParse(Convert.ToString(VariableGrid.Rows[i].Cells[5].Value), out min))
+                if (float.TryParse(Convert.ToString(VariableGrid.Rows[i].Cells[5].Value), out var min))
                     Solver.LowerBounds[count] = min;
                 
-                if (float.TryParse(Convert.ToString(VariableGrid.Rows[i].Cells[4].Value), out max))
+                if (float.TryParse(Convert.ToString(VariableGrid.Rows[i].Cells[4].Value), out var max))
                     Solver.UpperBounds[count] = max;
 
                 count++;
@@ -414,15 +446,23 @@ namespace DifficultyOptimizer
             // Solve Every Map's Difficulty
             for (var i = 0; i < MapData.Count; i++)
             {
-                var map = MapData[i];
-                var diff = map.Map.SolveDifficulty(ModIdentifier.None, Constants).OverallDifficulty;
-                var delta = Math.Pow(10f * (diff - map.TargetDifficulty), 2);
+                try
+                {
+                    var map = MapData[i];
+                    var diff = map.Map.SolveDifficulty(ModIdentifier.None, Constants).OverallDifficulty;
+                    var delta = Math.Pow(10f * (diff - map.TargetDifficulty), 2);
 
-                total += delta * map.Weight;
-                weight += map.Weight;
-                
-                if (updateUI)
-                    UpdaateMapDifficultyOutput(i, diff);
+                    total += delta * map.Weight;
+                    weight += map.Weight;
+
+                    if (updateUI)
+                        UpdaateMapDifficultyOutput(i, diff);
+
+                }
+                catch (Exception)
+                {
+                    total += 100000;
+                }
             }
 
             // Get an average for the F(x)
@@ -604,6 +644,7 @@ namespace DifficultyOptimizer
 
             // Handle case where data is unable to be parsed.
             var data = ParseAllMapData();
+            var constants = ParseConstantsInput(false);
             if (data.Count == 0)
             {
                 ErrorToOutput("Export failed. Unable to parse the data.");
@@ -616,6 +657,7 @@ namespace DifficultyOptimizer
                 var toSerialize = new JsonData
                 {
                     RootDirectory = RootFolder,
+                    Constants = constants,
                     Dataset = data
                 };
                 
@@ -702,12 +744,10 @@ namespace DifficultyOptimizer
             if (!(e.ColumnIndex == 2 || e.ColumnIndex == 3))
                 return;
 
-            float i;
-
-            if (float.TryParse(Convert.ToString(DataGrid.Rows[e.RowIndex].Cells[e.ColumnIndex].Value), out i))
+            if (float.TryParse(Convert.ToString(DataGrid.Rows[e.RowIndex].Cells[e.ColumnIndex].Value), out var i))
                 return;
 
-            DataGrid.Rows[e.RowIndex].Cells[e.ColumnIndex].Value = i.ToString();
+            DataGrid.Rows[e.RowIndex].Cells[e.ColumnIndex].Value = i;
         }
 
         private void splitContainer2_Panel2_Paint(object sender, PaintEventArgs e)
@@ -755,7 +795,13 @@ namespace DifficultyOptimizer
 
         private void VariableGrid_CellContentClick(object sender, DataGridViewCellEventArgs e)
         {
+            if (!(e.ColumnIndex == 2 || e.ColumnIndex == 4 || e.ColumnIndex == 5))
+                return;
 
+            if (float.TryParse(Convert.ToString(VariableGrid.Rows[e.RowIndex].Cells[e.ColumnIndex].Value), out var i))
+                return;
+
+            VariableGrid.Rows[e.RowIndex].Cells[e.ColumnIndex].Value = i;
         }
 
         private void ButtonCalculate_Click(object sender, EventArgs e) => ComputeForDifficulty();
@@ -801,13 +847,29 @@ namespace DifficultyOptimizer
 
         private void ButtonUseValues_Click(object sender, EventArgs e)
         {
+            var success = false;
             for (var i = 0; i < Constants.ConstantVariables.Count; i++)
             {
                 if (! (bool) VariableGrid.Rows[i].Cells[0].Value)
                     continue;
-                
-                VariableGrid.Rows[i].Cells[2].Value = VariableGrid.Rows[i].Cells[3].Value;
+
+                try
+                {
+                    float value;
+                    if (!float.TryParse(VariableGrid.Rows[i].Cells[3].Value.ToString(), out value))
+                        continue;
+
+                    success = true;
+                    VariableGrid.Rows[i].Cells[2].Value = value;
+                }
+                catch
+                {
+                    // ignored
+                }
             }
+            
+            if (!success)
+                ErrorToOutput("There are currently no optimized values to use as the input.");
         }
     }
 }

@@ -11,5 +11,7 @@ namespace DifficultyOptimizer.src
         public string RootDirectory;
 
         public List<MapData> Dataset;
+
+        public double[] Constants;
     }
 }
