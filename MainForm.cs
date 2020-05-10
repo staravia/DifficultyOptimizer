@@ -40,95 +40,133 @@ namespace DifficultyOptimizer
         private FolderBrowserDialog FolderBrowser = new FolderBrowserDialog();
 
         /// <summary>
-        /// 
+        /// Reference to the current constant variables.
         /// </summary>
         private StrainConstantsKeys Constants { get; set; }
         
         /// <summary>
-        /// 
+        /// Reference to the current map dataset.
         /// </summary>
         private List<MapData> MapData { get; set; }
 
         /// <summary>
-        /// 
+        /// Used to cancel the optimization task.
         /// </summary>
         private CancellationTokenSource TokenSource { get; set; }
 
         /// <summary>
-        /// 
+        /// Used to optimize the map difficulties.
         /// </summary>
         private NelderMead Solver { get; }
         
+        /// <summary>
+        /// Removes the root dir of given path.
+        /// </summary>
+        /// <param name="file"></param>
+        /// <returns></returns>
         private string RemoveRoot(string file) => file.Replace(RootFolder, ".");
 
+        /// <summary>
+        /// Adds the root dir to the given path.
+        /// </summary>
+        /// <param name="file"></param>
+        /// <returns></returns>
         private string AddRoot(string file) => RootFolder + file.Substring(1);
 
-        private void DeleteRow(int row) => DataGrid.Rows.RemoveAt(row);
+        /// <summary>
+        /// Deletes a row at the given index in the maps data grid.
+        /// </summary>
+        /// <param name="row"></param>
+        private void DeleteMapDataRow(int row) => DataGrid.Rows.RemoveAt(row);
 
-        private bool ValidateRow(int row) => File.Exists(AddRoot(GetMapFilePath(row)));
+        /// <summary>
+        /// This will validate the data.
+        /// </summary>
+        /// <param name="row"></param>
+        /// <returns></returns>
+        private bool ValidateMapDataRow(int row) => File.Exists(AddRoot(GetMapFilePath(row)));
+        
+        /// <summary>
+        /// This is invoked during optimization when a step has been completed.
+        /// </summary>
         private event EventHandler<string> OptimizeStepComplete;
 
+        /// <summary>
+        /// </summary>
         public DifficultyOptimizerForm()
         {
+            // Initialize File Browser / current dir
             CurrentDirectory = Directory.GetCurrentDirectory();
             FileBrowser.Multiselect = true;
             FileBrowser.Filter = "Map File|*.osu;*.qua";
+            
+            // Initialize UI/data
             SetRootFolder(CurrentDirectory);
             InitializeComponent();
+            CheckForLocalMapData();
+            InitializeConstants();
+            OptimizeStepComplete += OnOptimizeStepComplete;
+            
+            // Initialize Solver
+            Solver = new NelderMead(Constants.ConstantVariables.Count, GetOptimizedValue)
+            {
+                Convergence = new GeneralConvergence(Constants.ConstantVariables.Count)
+                {
+                    Evaluations = 0, 
+                    MaximumEvaluations = 1000
+                }
+            };
+        }
 
-            CheckForLocalJson();
-
+        /// <summary>
+        /// This initializes the constant variables in the difficulty solver.
+        /// </summary>
+        private void InitializeConstants()
+        {
             Constants = new StrainConstantsKeys();
             foreach (var constant in Constants.ConstantVariables)
                 ImportConstantData(constant.Name, constant.Value);
             
             VariableGrid.AllowUserToAddRows = false;
             VariableGrid.AllowUserToDeleteRows = false;
-            OptimizeStepComplete += OnOptimizeStepComplete;
-            
-            // Create Nelder Mead Solver
-            Solver = new NelderMead(Constants.ConstantVariables.Count, GetOptimizedValue)
-            {
-                Convergence = new GeneralConvergence(Constants.ConstantVariables.Count)
-                {
-                    Evaluations = 0, 
-                    MaximumEvaluations = 100000
-                }
-            };
         }
 
-        private void CheckForLocalJson()
+        /// <summary>
+        /// This will scan the root directory for the DifficultyData.json file
+        /// </summary>
+        private void CheckForLocalMapData()
         {
             var path = $"{CurrentDirectory}\\DifficultyData.json";
-
+            
             PrintToOutput($"Searching for local DifficultyData.json file: {path}");
 
-            if (File.Exists(path))
+            // If there's no DifficultyData.json file in the current path of this program, the user will have to manually set things up.
+            if (!File.Exists(path))
             {
-                try
-                {
-
-                    var file = File.ReadAllText(path);
-                    var data = JsonConvert.DeserializeObject<JsonData>(file);
-
-                    if (!Directory.Exists(data.RootDirectory))
-                    {
-                        ErrorToOutput($"Local DifficultyData.json found, but Directory does not exist: {data.RootDirectory}");
-                        PrintToOutput($"If you are importing this data from another machine, please set the maps directory.");
-                        return;
-                    }
-
-                    SetRootFolder(data.RootDirectory);
-                    ImportMaps(data);
-                }
-                catch
-                {
-                    ErrorToOutput($"Failed to parse local DifficultyData.json file");
-                }
+                PrintToOutput($"DifficultyData.json does not exist. Please set your maps directory before importing maps or datasets. \nCurrent directory: {CurrentDirectory}");
                 return;
             }
 
-            PrintToOutput($"DifficultyData.json does not exist. Please set your maps directory before importing maps or datasets. \nCurrent directory: {CurrentDirectory}");
+            // This will attempt to import all the map data into the current program.
+            try
+            {
+                var file = File.ReadAllText(path);
+                var data = JsonConvert.DeserializeObject<JsonData>(file);
+
+                if (!Directory.Exists(data.RootDirectory))
+                {
+                    ErrorToOutput($"Local DifficultyData.json found, but Directory does not exist: {data.RootDirectory}");
+                    PrintToOutput($"If you are importing this data from another machine, please set the maps directory.");
+                    return;
+                }
+
+                SetRootFolder(data.RootDirectory);
+                ImportMaps(data);
+            }
+            catch
+            {
+                ErrorToOutput($"Failed to parse local DifficultyData.json file");
+            }
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -186,6 +224,7 @@ namespace DifficultyOptimizer
             // Update MapData List
             TokenSource = new CancellationTokenSource();
             MapData = ParseMapData(true);
+            ButtonOptimize.Text = "Cancel Optimization";
             UpdateSolver();
 
             if (MapData.Count == 0)
@@ -223,6 +262,7 @@ namespace DifficultyOptimizer
             finally
             {
                 TokenSource = null;
+                ButtonOptimize.Text = "Optimize";
             }
         }
 
@@ -232,6 +272,7 @@ namespace DifficultyOptimizer
         {
             // Update Cancellation Token
             Solver.Token = TokenSource.Token;
+            Solver.Convergence.Evaluations = 0;
             
             // Set Lower bounds
             for (var i = 0; i < Solver.LowerBounds.Length; i++)
@@ -289,14 +330,22 @@ namespace DifficultyOptimizer
         /// <param name="stopwatch"></param>
         private void HandleOptimizeCompleted(Stopwatch stopwatch)
         {
+            // Dispose cancellation token + stop stopwatch
             TokenSource.Dispose();
             TokenSource = null;
             stopwatch.Stop();
-            PrintToOutput($"Done! Took {stopwatch.Elapsed.TotalSeconds} seconds to compute!");
 
+            // Update constants in UI
             for (var i = 0; i < Solver.Solution.Length; i++)
                 UpdateConstantData(i, (float)Solver.Solution[i]);
 
+            // Compute for current difficulties + update output
+            ComputeForDifficulty();
+            PrintToOutput($"Done! Took {stopwatch.Elapsed.TotalSeconds} seconds to compute!");
+        }
+
+        private void ComputeForDifficulty()
+        {
             for (var i = 0; i < MapData.Count; i++)
                 UpdaateMapOutput(i, MapData[i].Map.SolveDifficulty(ModIdentifier.None, Constants).OverallDifficulty);
         }
@@ -414,13 +463,13 @@ namespace DifficultyOptimizer
         {
             for (var i = 0; i < DataGrid.Rows.Count - 1; i++)
             {
-                var valid = ValidateRow(i);
+                var valid = ValidateMapDataRow(i);
 
                 if (valid)
                     continue;
 
                 ErrorToOutput($"Invalid file path: {GetMapFilePath(i)}");
-                DeleteRow(i);
+                DeleteMapDataRow(i);
                 i--;
             }
 
@@ -601,7 +650,7 @@ namespace DifficultyOptimizer
 
         private void ButtonCalculate_Click(object sender, EventArgs e)
         {
-            //asd
+            ComputeForDifficulty();
         }
     }
 }
