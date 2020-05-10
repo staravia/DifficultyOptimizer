@@ -57,7 +57,12 @@ namespace DifficultyOptimizer
         /// <summary>
         /// Used to optimize the map difficulties.
         /// </summary>
-        private NelderMead Solver { get; }
+        private NelderMead Solver { get; set; }
+        
+        /// <summary>
+        /// Determines which constants by which constants are supposed to be solved.
+        /// </summary>
+        private bool[] ActiveConstants { get; }
         
         /// <summary>
         /// Removes the root dir of given path.
@@ -135,15 +140,8 @@ namespace DifficultyOptimizer
             InitializeConstants();
             OptimizeStepComplete += OnOptimizeStepComplete;
             
-            // Initialize Solver
-            Solver = new NelderMead(Constants.ConstantVariables.Count, SolverFX)
-            {
-                Convergence = new GeneralConvergence(Constants.ConstantVariables.Count)
-                {
-                    Evaluations = 0, 
-                    MaximumEvaluations = 1000
-                }
-            };
+            // Initialize ActiveConstants
+            ActiveConstants = new bool[Constants.ConstantVariables.Count];
         }
 
         /// <summary>
@@ -207,10 +205,11 @@ namespace DifficultyOptimizer
             ClearOutput();
             
             // Update MapData List
-            TokenSource = new CancellationTokenSource();
+            var token = new CancellationTokenSource();
+            TokenSource = token;
             MapData = ParseAllMapData(true);
             ButtonOptimize.Text = "Cancel Optimization";
-            UpdateSolver();
+            InitializeSolver();
 
             // If there's no map data, it's either because it failed to parse or the user hasn't imported them yet.
             if (MapData.Count == 0)
@@ -227,21 +226,27 @@ namespace DifficultyOptimizer
             try
             {
                 Action<Task> action = delegate { HandleOptimizeCompleted(stopwatch); };
-                var task = Task.Run(() => Solver.Minimize(GetConstantsInput()), TokenSource.Token)
-                    .ContinueWith(action, TokenSource.Token);
+
+                var task = Task.Run(() => Solver.Minimize(ParseConstantsInput(true)), token.Token)
+                    .ContinueWith(action, token.Token);
 
                 await task;
 
-                TokenSource.Token.ThrowIfCancellationRequested();
+                token.Token.ThrowIfCancellationRequested();
             }
             catch (OperationCanceledException)
             {
-                PrintToOutput("Optimization Cancelled.");
-                TokenSource.Dispose();
+                ErrorToOutput("Optimization Cancelled.");
+                TokenSource = null;
+            }
+            catch (Exception e)
+            {
+                ErrorToOutput("Failed to optimize.");
+                ErrorToOutput(e.Message);
+                ErrorToOutput(e.StackTrace);
             }
             finally
             {
-                TokenSource = null;
                 ButtonOptimize.Text = "Optimize";
             }
         }
@@ -265,12 +270,31 @@ namespace DifficultyOptimizer
         /// Get all the inputted constants in a double array
         /// </summary>
         /// <returns></returns>
-        private double[] GetConstantsInput()
+        private double[] ParseConstantsInput(bool partial)
         {
-            var output = new double[Constants.ConstantVariables.Count];
+            double[] output;
 
-            for (var i = 0; i < Constants.ConstantVariables.Count; i++)
-                output[i] = GetConstantFromInput(i);
+            if (partial)
+            {
+                var count = 0;
+                output = new double[Solver.Capacity];
+                
+                for (var i = 0; i < ActiveConstants.Length; i++)
+                {
+                    if (!ActiveConstants[i])
+                        continue;
+
+                    output[count] = GetConstantFromInput(i);
+                    count++;
+                }
+            }
+            else
+            {
+                output = new double[Constants.ConstantVariables.Count];
+                
+                for (var i = 0; i < Constants.ConstantVariables.Count; i++)
+                    output[i] = GetConstantFromInput(i);   
+            }
 
             return output;
         }
@@ -279,23 +303,63 @@ namespace DifficultyOptimizer
         /// Updates all the constants to match a specific input
         /// </summary>
         /// <param name="input"></param>
-        private void UpdateConstants(double[] input)
+        private void UpdateConstants(double[] input, bool partial)
         {
-            float[] inputf = Array.ConvertAll(input, x => (float)x);
+            var inputf = new float[Constants.ConstantVariables.Count];
+            if (partial)
+            {
+                var count = 0;
+                
+                for (var i = 0; i < Constants.ConstantVariables.Count; i++)
+                {
+                    if (!ActiveConstants[i])
+                    {
+                        inputf[i] = (float)GetConstantFromInput(i);
+                        continue;
+                    }
+
+                    inputf[i] = (float)input[count];
+                    count++;
+                }
+            }
+            
+            else
+                inputf = Array.ConvertAll(input, x => (float)x);
+            
             Constants = new StrainConstantsKeys(inputf);
         }
 
         /// <summary>
         /// Updates the current solver algorithm
         /// </summary>
-        private void UpdateSolver()
+        private void InitializeSolver()
         {
-            // Update Cancellation Token
-            Solver.Token = TokenSource.Token;
-            Solver.Convergence.Evaluations = 0;
+            // Update ActiveConstants
+            var count = 0;
             
+            for (var i = 0; i < Constants.ConstantVariables.Count; i++)
+            {
+                ActiveConstants[i] = (bool) VariableGrid.Rows[i].Cells[0].Value;
+
+                if (ActiveConstants[i])
+                    count++;
+            }
+
+            // Initialize Solver
+            Solver = new NelderMead(count, SolverFX)
+            {
+                Convergence = new GeneralConvergence(count)
+                {
+                    Evaluations = 0, 
+                    MaximumEvaluations = 1000
+                },
+                
+                Token = TokenSource.Token
+            };
+
+/*
             // Set Lower bounds
-            for (var i = 0; i < Solver.LowerBounds.Length; i++)
+            for (var i = 0; i < Solver.Capacity; i++)
             {
                 float val;
 
@@ -304,13 +368,14 @@ namespace DifficultyOptimizer
             }
             
             // Set Upper bounds
-            for (var i = 0; i < Solver.LowerBounds.Length; i++)
+            for (var i = 0; i < Solver.Capacity; i++)
             {
                 float val;
 
                 if (float.TryParse(Convert.ToString(VariableGrid.Rows[i].Cells[4].Value), out val))
                     Solver.UpperBounds[i] = val;
             }
+            */
         }
 
         /// <summary>
@@ -323,7 +388,7 @@ namespace DifficultyOptimizer
             if (TokenSource.IsCancellationRequested)
                 return 0;
 
-            UpdateConstants(input);
+            UpdateConstants(input, true);
             return GetCurrentFX(false);
         }
 
@@ -366,13 +431,12 @@ namespace DifficultyOptimizer
         private void HandleOptimizeCompleted(Stopwatch stopwatch)
         {
             // Dispose cancellation token + stop stopwatch
-            TokenSource.Dispose();
             TokenSource = null;
             stopwatch.Stop();
 
             // Update constants in UI
-            for (var i = 0; i < Solver.Solution.Length; i++)
-                UpdateConstantOutput(i, (float)Solver.Solution[i]);
+            for (var i = 0; i < Constants.ConstantVariables.Count; i++)
+                UpdateConstantOutput(i, Constants.ConstantVariables[i].Value);
 
             // Compute for current difficulties + update output
             GetCurrentFX(true);
@@ -387,7 +451,7 @@ namespace DifficultyOptimizer
             if (MapData == null)
                 MapData = ParseAllMapData(true);
             
-            UpdateConstants(GetConstantsInput());
+            UpdateConstants(ParseConstantsInput(false), false);
             GetCurrentFX(true);
         }
 
@@ -399,7 +463,9 @@ namespace DifficultyOptimizer
         private void OnOptimizeStepComplete(object sender, string output)
         {
             PrintToOutput(output);
-            ProgressBar.Value = (int)(100 * Solver.Convergence.Evaluations / (float)Solver.Convergence.MaximumEvaluations);
+            
+            if (Solver != null)
+                ProgressBar.Value = (int)(100 * Solver.Convergence.Evaluations / (float)Solver.Convergence.MaximumEvaluations);
         }
 
         /// <summary>
@@ -475,7 +541,7 @@ namespace DifficultyOptimizer
         /// <param name="optimize"></param>
         /// <param name="max"></param>
         /// <param name="min"></param>
-        private void TryImportConstantData(string name, float value, bool optimize = true, float max = 1000f, float min = 0)
+        private void TryImportConstantData(string name, float value, bool optimize = false, float max = 1000f, float min = 0)
         {
             var row = (DataGridViewRow)VariableGrid.Rows[0].Clone();
             row.Cells[1].Value = name;
