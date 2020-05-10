@@ -14,6 +14,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using Quaver.API.Maps.Processors.Difficulty.Optimization;
 
 namespace DifficultyOptimizer
 {
@@ -325,7 +326,7 @@ namespace DifficultyOptimizer
             
             else
                 inputf = Array.ConvertAll(input, x => (float)x);
-            
+
             Constants = new StrainConstantsKeys(inputf);
         }
 
@@ -357,25 +358,31 @@ namespace DifficultyOptimizer
                 Token = TokenSource.Token
             };
 
-/*
+            // Set step size
+            const double scale = 0.15;
+            var data = ParseConstantsInput(true);
+
+            for (var i = 0; i < Solver.StepSize.Length; i++)
+                Solver.StepSize[i] = data[i] * scale;
+
             // Set Lower bounds
-            for (var i = 0; i < Solver.Capacity; i++)
+            count = 0;
+            for (var i = 0; i < ActiveConstants.Length; i++)
             {
-                float val;
+                if (!ActiveConstants[i])
+                    continue;
+                
+                float min;
+                float max;
 
-                if (float.TryParse(Convert.ToString(VariableGrid.Rows[i].Cells[5].Value), out val))
-                    Solver.LowerBounds[i] = val;
-            }
-            
-            // Set Upper bounds
-            for (var i = 0; i < Solver.Capacity; i++)
-            {
-                float val;
+                if (float.TryParse(Convert.ToString(VariableGrid.Rows[i].Cells[5].Value), out min))
+                    Solver.LowerBounds[count] = min;
+                
+                if (float.TryParse(Convert.ToString(VariableGrid.Rows[i].Cells[4].Value), out max))
+                    Solver.UpperBounds[count] = max;
 
-                if (float.TryParse(Convert.ToString(VariableGrid.Rows[i].Cells[4].Value), out val))
-                    Solver.UpperBounds[i] = val;
+                count++;
             }
-            */
         }
 
         /// <summary>
@@ -389,6 +396,7 @@ namespace DifficultyOptimizer
                 return 0;
 
             UpdateConstants(input, true);
+            
             return GetCurrentFX(false);
         }
 
@@ -418,7 +426,7 @@ namespace DifficultyOptimizer
 
             // Get an average for the F(x)
             var value = total / weight;
-
+            
             OptimizeStepComplete?.Invoke(this, $"Current f(x) = {value}");
 
             return value;
@@ -431,6 +439,7 @@ namespace DifficultyOptimizer
         private void HandleOptimizeCompleted(Stopwatch stopwatch)
         {
             // Dispose cancellation token + stop stopwatch
+            ProgressBar.Value = 100;
             TokenSource = null;
             stopwatch.Stop();
 
@@ -541,13 +550,13 @@ namespace DifficultyOptimizer
         /// <param name="optimize"></param>
         /// <param name="max"></param>
         /// <param name="min"></param>
-        private void TryImportConstantData(string name, float value, bool optimize = false, float max = 1000f, float min = 0)
+        private void TryImportConstantData(string name, float value, bool optimize = true, float min = 0)
         {
             var row = (DataGridViewRow)VariableGrid.Rows[0].Clone();
             row.Cells[1].Value = name;
             row.Cells[2].Value = value;
             row.Cells[0].Value = optimize;
-            row.Cells[4].Value = max;
+            row.Cells[4].Value = value * 2f + 5;
             row.Cells[5].Value = min;
             VariableGrid.Rows.Add(row);
         }
