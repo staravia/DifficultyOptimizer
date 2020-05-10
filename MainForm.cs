@@ -512,18 +512,16 @@ namespace DifficultyOptimizer
         /// </summary>
         private void TryExportData()
         {
-            var valid = ValidateAllMaps();
-
             // Handle case where the dataset is invalid.
+            var valid = ValidateAllMaps();
             if (!valid)
             {
                 ErrorToOutput("Export failed. Invalid dataset.");
                 return;
             }
 
-            var data = ParseAllMapData();
-
             // Handle case where data is unable to be parsed.
+            var data = ParseAllMapData();
             if (data.Count == 0)
             {
                 ErrorToOutput("Export failed. Unable to parse the data.");
@@ -538,12 +536,8 @@ namespace DifficultyOptimizer
                     RootDirectory = RootFolder,
                     Dataset = data
                 };
-
-                var json = JsonConvert.SerializeObject(toSerialize); // Json..Serialize(toSerialize);
-                var dir = CurrentDirectory;
-
-                File.WriteAllText($"{CurrentDirectory}\\DifficultyData.json", json);
-
+                
+                File.WriteAllText($"{CurrentDirectory}\\DifficultyData.json", JsonConvert.SerializeObject(toSerialize));
                 PrintToOutput($"DifficultyData.json has been successfully created in: {CurrentDirectory}");
             }
             catch
@@ -614,8 +608,7 @@ namespace DifficultyOptimizer
         /// </summary>
         /// <param name="index"></param>
         /// <param name="output"></param>
-        private void UpdateConstantOutput(int index, float output) =>
-            VariableGrid.Rows[index].Cells[3].Value = output;
+        private void UpdateConstantOutput(int index, float output) => VariableGrid.Rows[index].Cells[3].Value = output;
         
         private void Form1_Load(object sender, EventArgs e)
         {
@@ -683,10 +676,7 @@ namespace DifficultyOptimizer
 
         }
 
-        private void ButtonCalculate_Click(object sender, EventArgs e)
-        {
-            ComputeForDifficulty();
-        }
+        private void ButtonCalculate_Click(object sender, EventArgs e) => ComputeForDifficulty();
         
         private void ButtonOptimize_Click(object sender, EventArgs e)
         {
@@ -725,9 +715,6 @@ namespace DifficultyOptimizer
             }
         }
         
-        private void ButtonExportData_Click(object sender, EventArgs e)
-        {
-            TryExportData();
-        }
+        private void ButtonExportData_Click(object sender, EventArgs e) => TryExportData();
     }
 }
