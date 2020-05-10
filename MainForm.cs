@@ -87,6 +87,34 @@ namespace DifficultyOptimizer
         private bool ValidateMapDataRow(int row) => File.Exists(AddRoot(GetMapFilePath(row)));
         
         /// <summary>
+        /// This will check every maps to see if they are valid.
+        /// </summary>
+        /// <returns></returns>
+        private bool ValidateAllMaps()
+        {
+            for (var i = 0; i < DataGrid.Rows.Count - 1; i++)
+            {
+                var valid = ValidateMapDataRow(i);
+
+                if (valid)
+                    continue;
+
+                ErrorToOutput($"Invalid file path: {GetMapFilePath(i)}");
+                DeleteMapDataRow(i);
+                i--;
+            }
+
+            return DataGrid.Rows.Count > 1;
+        }
+        
+        /// <summary>
+        /// Gets the file path of a map from a specific index
+        /// </summary>
+        /// <param name="row"></param>
+        /// <returns></returns>
+        private string GetMapFilePath(int row) => DataGrid.Rows[row].Cells[1].Value.ToString();
+        
+        /// <summary>
         /// This is invoked during optimization when a step has been completed.
         /// </summary>
         private event EventHandler<string> OptimizeStepComplete;
@@ -108,7 +136,7 @@ namespace DifficultyOptimizer
             OptimizeStepComplete += OnOptimizeStepComplete;
             
             // Initialize Solver
-            Solver = new NelderMead(Constants.ConstantVariables.Count, GetOptimizedValue)
+            Solver = new NelderMead(Constants.ConstantVariables.Count, SolverFX)
             {
                 Convergence = new GeneralConvergence(Constants.ConstantVariables.Count)
                 {
@@ -125,7 +153,7 @@ namespace DifficultyOptimizer
         {
             Constants = new StrainConstantsKeys();
             foreach (var constant in Constants.ConstantVariables)
-                ImportConstantData(constant.Name, constant.Value);
+                TryImportConstantData(constant.Name, constant.Value);
             
             VariableGrid.AllowUserToAddRows = false;
             VariableGrid.AllowUserToDeleteRows = false;
@@ -169,53 +197,10 @@ namespace DifficultyOptimizer
             }
         }
 
-        private void Form1_Load(object sender, EventArgs e)
-        {
-            
-        }
-
-        private void splitContainer1_Panel2_Paint(object sender, PaintEventArgs e)
-        {
-
-        }
-
-        private void listView1_SelectedIndexChanged(object sender, EventArgs e)
-        {
-
-        }
-
-        private void splitContainer1_Panel1_Paint(object sender, PaintEventArgs e)
-        {
-
-        }
-
-        private void tableLayoutPanel1_Paint(object sender, PaintEventArgs e)
-        {
-
-        }
-
-        private double GetInputConstant(int index)
-        {
-            float val;
-
-            if (float.TryParse(Convert.ToString(VariableGrid.Rows[index].Cells[2].Value), out val))
-                return val;
-
-            return 0;
-        }
-
-        private void ButtonOptimize_Click(object sender, EventArgs e)
-        {
-            // Todo: Find a way to cancel the optimization while it is running
-            if (TokenSource != null)
-            {
-                TokenSource.Cancel();
-                return;
-            }
-
-            HandleOptimization();
-        }
-
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
         private async Task HandleOptimization()
         {
             // Clear the output so it doesn't get clogged up.
@@ -223,31 +208,26 @@ namespace DifficultyOptimizer
             
             // Update MapData List
             TokenSource = new CancellationTokenSource();
-            MapData = ParseMapData(true);
+            MapData = ParseAllMapData(true);
             ButtonOptimize.Text = "Cancel Optimization";
             UpdateSolver();
 
+            // If there's no map data, it's either because it failed to parse or the user hasn't imported them yet.
             if (MapData.Count == 0)
             {
                 ErrorToOutput("Failed to parse map data.");
                 return;
             }
             
-            // Initialize Input
-            var input = new double[Constants.ConstantVariables.Count];
-
-            for (var i = 0; i < Constants.ConstantVariables.Count; i++)
-                input[i] = GetInputConstant(i);
-            
-            // Create Stopwatch
+            // Initialize Stopwatch
             var stopwatch = new Stopwatch();
             stopwatch.Start();
 
-            // Solve
+            // Optimize Difficulty via Solver
             try
             {
                 Action<Task> action = delegate { HandleOptimizeCompleted(stopwatch); };
-                var task = Task.Run(() => Solver.Minimize(input), TokenSource.Token)
+                var task = Task.Run(() => Solver.Minimize(GetConstantsInput()), TokenSource.Token)
                     .ContinueWith(action, TokenSource.Token);
 
                 await task;
@@ -265,8 +245,48 @@ namespace DifficultyOptimizer
                 ButtonOptimize.Text = "Optimize";
             }
         }
+        
+        /// <summary>
+        /// Gets a single input for a specific constant with given index
+        /// </summary>
+        /// <param name="index"></param>
+        /// <returns></returns>
+        private double GetConstantFromInput(int index)
+        {
+            float val;
+
+            if (float.TryParse(Convert.ToString(VariableGrid.Rows[index].Cells[2].Value), out val))
+                return val;
+
+            return 0;
+        }
 
         /// <summary>
+        /// Get all the inputted constants in a double array
+        /// </summary>
+        /// <returns></returns>
+        private double[] GetConstantsInput()
+        {
+            var output = new double[Constants.ConstantVariables.Count];
+
+            for (var i = 0; i < Constants.ConstantVariables.Count; i++)
+                output[i] = GetConstantFromInput(i);
+
+            return output;
+        }
+        
+        /// <summary>
+        /// Updates all the constants to match a specific input
+        /// </summary>
+        /// <param name="input"></param>
+        private void UpdateConstants(double[] input)
+        {
+            float[] inputf = Array.ConvertAll(input, x => (float)x);
+            Constants = new StrainConstantsKeys(inputf);
+        }
+
+        /// <summary>
+        /// Updates the current solver algorithm
         /// </summary>
         private void UpdateSolver()
         {
@@ -294,30 +314,44 @@ namespace DifficultyOptimizer
         }
 
         /// <summary>
+        /// This is used in the optimization method. This function could be cancelled.
         /// </summary>
         /// <param name="input"></param>
         /// <returns></returns>
-        private double GetOptimizedValue(double[] input)
+        private double SolverFX(double[] input)
         {
             if (TokenSource.IsCancellationRequested)
                 return 0;
-            
-            float[] inputf = Array.ConvertAll(input, x => (float)x);
+
+            UpdateConstants(input);
+            return GetCurrentFX(false);
+        }
+
+        /// <summary>
+        /// Gets the current F(x).
+        /// </summary>
+        /// <param name="input"></param>
+        /// <returns></returns>
+        private double GetCurrentFX(bool updateUI)
+        {
             double total = 0;
             double weight = 0;
             
-            Constants = new StrainConstantsKeys(inputf);
-            
             // Solve Every Map's Difficulty
-            foreach (var map in MapData)
+            for (var i = 0; i < MapData.Count; i++)
             {
+                var map = MapData[i];
                 var diff = map.Map.SolveDifficulty(ModIdentifier.None, Constants).OverallDifficulty;
                 var delta = Math.Pow(10f * (diff - map.TargetDifficulty), 2);
 
                 total += delta * map.Weight;
                 weight += map.Weight;
+                
+                if (updateUI)
+                    UpdaateMapDifficultyOutput(i, diff);
             }
 
+            // Get an average for the F(x)
             var value = total / weight;
 
             OptimizeStepComplete?.Invoke(this, $"Current f(x) = {value}");
@@ -326,6 +360,7 @@ namespace DifficultyOptimizer
         }
 
         /// <summary>
+        /// This is called once the optimization method is complete
         /// </summary>
         /// <param name="stopwatch"></param>
         private void HandleOptimizeCompleted(Stopwatch stopwatch)
@@ -337,20 +372,27 @@ namespace DifficultyOptimizer
 
             // Update constants in UI
             for (var i = 0; i < Solver.Solution.Length; i++)
-                UpdateConstantData(i, (float)Solver.Solution[i]);
+                UpdateConstantOutput(i, (float)Solver.Solution[i]);
 
             // Compute for current difficulties + update output
-            ComputeForDifficulty();
+            GetCurrentFX(true);
             PrintToOutput($"Done! Took {stopwatch.Elapsed.TotalSeconds} seconds to compute!");
         }
 
+        /// <summary>
+        /// Computes the difficulty for every map and update the UI.
+        /// </summary>
         private void ComputeForDifficulty()
         {
-            for (var i = 0; i < MapData.Count; i++)
-                UpdaateMapOutput(i, MapData[i].Map.SolveDifficulty(ModIdentifier.None, Constants).OverallDifficulty);
+            if (MapData == null)
+                MapData = ParseAllMapData(true);
+            
+            UpdateConstants(GetConstantsInput());
+            GetCurrentFX(true);
         }
 
         /// <summary>
+        /// This is called once a step has been completed during optimization.
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="output"></param>
@@ -358,22 +400,6 @@ namespace DifficultyOptimizer
         {
             PrintToOutput(output);
             ProgressBar.Value = (int)(100 * Solver.Convergence.Evaluations / (float)Solver.Convergence.MaximumEvaluations);
-        }
-
-        /// <summary>
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void ButtonSetDirectory_Click(object sender, EventArgs e)
-        {
-            if (FolderBrowser.ShowDialog() != DialogResult.OK)
-            {
-                ErrorToOutput("Cancelled Root Directory setup");
-                return;
-            }
-
-            PrintToOutput($"Relative Root directory for maps has been set to: {FolderBrowser.SelectedPath}");
-            SetRootFolder(FolderBrowser.SelectedPath);
         }
 
         /// <summary>
@@ -408,7 +434,13 @@ namespace DifficultyOptimizer
             TextBoxOutput.ScrollToCaret();
         }
         
-        private void ImportMapData(string file, float diff = 1f, float weight = 0.5f)
+        /// <summary>
+        /// Tries to import map data from given file.
+        /// </summary>
+        /// <param name="file"></param>
+        /// <param name="diff"></param>
+        /// <param name="weight"></param>
+        private void TryImportMapData(string file, float diff = 1f, float weight = 0.5f)
         {
             try
             {
@@ -428,9 +460,22 @@ namespace DifficultyOptimizer
             }
         }
         
-        private void UpdaateMapOutput(int index, float diff) => DataGrid.Rows[index].Cells[4].Value = diff;
+        /// <summary>
+        /// Updates the UI to display the output of a map's difficulty.
+        /// </summary>
+        /// <param name="index"></param>
+        /// <param name="diff"></param>
+        private void UpdaateMapDifficultyOutput(int index, float diff) => DataGrid.Rows[index].Cells[4].Value = diff;
 
-        private void ImportConstantData(string name, float value, bool optimize = true, float max = 1000f, float min = 0)
+        /// <summary>
+        /// Tries to import constant data.
+        /// </summary>
+        /// <param name="name"></param>
+        /// <param name="value"></param>
+        /// <param name="optimize"></param>
+        /// <param name="max"></param>
+        /// <param name="min"></param>
+        private void TryImportConstantData(string name, float value, bool optimize = true, float max = 1000f, float min = 0)
         {
             var row = (DataGridViewRow)VariableGrid.Rows[0].Clone();
             row.Cells[1].Value = name;
@@ -440,45 +485,142 @@ namespace DifficultyOptimizer
             row.Cells[5].Value = min;
             VariableGrid.Rows.Add(row);
         }
-
-        private void ButtonImportMap_Click(object sender, EventArgs e)
+        
+        /// <summary>
+        /// This will attempt to import map data with given json file.
+        /// </summary>
+        /// <param name="data"></param>
+        private void ImportMaps(JsonData data)
         {
-            if (FileBrowser.ShowDialog() != DialogResult.OK || !FileBrowser.CheckFileExists)
+            foreach (var map in data.Dataset)
+                TryImportMapData(map.FilePath, map.TargetDifficulty, map.Weight);
+
+            var valid = ValidateAllMaps();
+
+            if (!valid)
             {
-                ErrorToOutput("Maps Import Cancelled.");
+                ErrorToOutput("Import Failed. Failed to find a single file path. Make sure that the maps directory is set.");
+                PrintToOutput($"Current Directory has been changed to: {CurrentDirectory}");
                 return;
             }
 
-            foreach (var file in FileBrowser.FileNames)
-            {
-                ImportMapData(file);
-            }
+            PrintToOutput("Import succeeded.");
         }
 
-
-        private void UpdateConstantData(int index, float output) =>
-            VariableGrid.Rows[index].Cells[3].Value = output;
-
-        private bool ValidateData()
+        /// <summary>
+        /// Tries to export map data as a DifficultyData.json file.
+        /// </summary>
+        private void TryExportData()
         {
-            for (var i = 0; i < DataGrid.Rows.Count - 1; i++)
+            var valid = ValidateAllMaps();
+
+            // Handle case where the dataset is invalid.
+            if (!valid)
             {
-                var valid = ValidateMapDataRow(i);
-
-                if (valid)
-                    continue;
-
-                ErrorToOutput($"Invalid file path: {GetMapFilePath(i)}");
-                DeleteMapDataRow(i);
-                i--;
+                ErrorToOutput("Export failed. Invalid dataset.");
+                return;
             }
 
+            var data = ParseAllMapData();
 
+            // Handle case where data is unable to be parsed.
+            if (data.Count == 0)
+            {
+                ErrorToOutput("Export failed. Unable to parse the data.");
+                return;
+            }
 
-            return DataGrid.Rows.Count > 1;
+            // Tries to serialize and write the DifficultyData.json file.
+            try
+            {
+                var toSerialize = new JsonData
+                {
+                    RootDirectory = RootFolder,
+                    Dataset = data
+                };
+
+                var json = JsonConvert.SerializeObject(toSerialize); // Json..Serialize(toSerialize);
+                var dir = CurrentDirectory;
+
+                File.WriteAllText($"{CurrentDirectory}\\DifficultyData.json", json);
+
+                PrintToOutput($"DifficultyData.json has been successfully created in: {CurrentDirectory}");
+            }
+            catch
+            {
+                ErrorToOutput("Export failed. Failed to write data to disk.");
+            }
         }
 
-        private string GetMapFilePath(int row) => DataGrid.Rows[row].Cells[1].Value.ToString();
+        /// <summary>
+        /// Converts the input of a specific row from the data grid into a Qua file.
+        /// </summary>
+        /// <param name="row"></param>
+        /// <param name="parseMap"></param>
+        /// <returns></returns>
+        private MapData ParseMapsRowData(int row, bool parseMap = false)
+        {
+            var file = parseMap ? AddRoot(GetMapFilePath(row)) : GetMapFilePath(row);
+            var difficulty = float.Parse(DataGrid.Rows[row].Cells[2].Value.ToString());
+            var weight = float.Parse(DataGrid.Rows[row].Cells[3].Value.ToString());
+            Qua map = null;
+
+            if (parseMap)
+            {
+                try
+                {
+                    if (file.EndsWith(".qua"))
+                        map = Qua.Parse(file);
+                    else if (file.EndsWith(".osu"))
+                        map = new OsuBeatmap(file).ToQua();
+
+                    PrintToOutput($"Map successfully parsed: {file}");
+                }
+                catch (Exception e)
+                {
+                    ErrorToOutput($"Error parsing map: {e.Message}");
+                }
+            }
+
+            return new MapData(file, difficulty, weight, map);
+        }
+
+        /// <summary>
+        /// Parses every maps into a list.
+        /// </summary>
+        /// <param name="parseMap"></param>
+        /// <returns></returns>
+        private List<MapData> ParseAllMapData(bool parseMap = false)
+        {
+            var data = new List<MapData>();
+
+            for (var row = 0; row < DataGrid.Rows.Count - 1; row++)
+            {
+                try
+                {
+                    data.Add(ParseMapsRowData(row, parseMap));
+                }
+                catch
+                {
+                    // Ignored
+                }
+            }
+
+            return data;
+        }
+
+        /// <summary>
+        /// Updates the output of a constant in the UI
+        /// </summary>
+        /// <param name="index"></param>
+        /// <param name="output"></param>
+        private void UpdateConstantOutput(int index, float output) =>
+            VariableGrid.Rows[index].Cells[3].Value = output;
+        
+        private void Form1_Load(object sender, EventArgs e)
+        {
+            
+        }
 
         private void dataGridView1_CellContentClick(object sender, DataGridViewCellEventArgs e)
         {
@@ -513,14 +655,14 @@ namespace DifficultyOptimizer
 
             if (browser.ShowDialog() != DialogResult.OK || !browser.CheckPathExists)
             {
-                ErrorToOutput("Json import cancelled.");
+                ErrorToOutput("DifficultyData.json import cancelled.");
                 return;
             }
 
             try
             {
                 var file = File.ReadAllText(browser.FileName);
-                ClearTable();
+                DataGrid.Rows.Clear();
 
                 var data = JsonConvert.DeserializeObject<JsonData>(file);
                 ImportMaps(data);
@@ -529,113 +671,6 @@ namespace DifficultyOptimizer
             {
                 ErrorToOutput("Import Failed. Failed to deserialize file.");
             }
-        }
-
-        private void ImportMaps(JsonData data)
-        {
-            foreach (var map in data.Dataset)
-                ImportMapData(map.FilePath, map.TargetDifficulty, map.Weight);
-
-            var valid = ValidateData();
-
-            if (!valid)
-            {
-                ErrorToOutput("Import Failed. Failed to find a single file path. Make sure that the maps directory is set.");
-                PrintToOutput($"Current Directory has been changed to: {CurrentDirectory}");
-                return;
-            }
-
-            PrintToOutput("Import succeeded.");
-        }
-
-        private void ClearTable()
-        {
-            DataGrid.Rows.Clear();
-        }
-
-        private void ButtonExportData_Click(object sender, EventArgs e)
-        {
-            var valid = ValidateData();
-
-            if (!valid)
-            {
-                ErrorToOutput("Export failed. Invalid dataset.");
-                return;
-            }
-
-            var data = ParseMapData();
-
-            if (data.Count == 0)
-            {
-                ErrorToOutput("Export failed. Unable to parse the data.");
-                return;
-            }
-
-            try
-            {
-                var toSerialize = new JsonData()
-                {
-                    RootDirectory = RootFolder,
-                    Dataset = data
-                };
-
-                var json = JsonConvert.SerializeObject(toSerialize); // Json..Serialize(toSerialize);
-                var dir = CurrentDirectory;
-
-                File.WriteAllText($"{CurrentDirectory}\\DifficultyData.json", json);
-
-                PrintToOutput($"Json has been successfully created in: {CurrentDirectory}");
-            }
-            catch
-            {
-                ErrorToOutput("Export failed. Failed to write data to disk.");
-            }
-        }
-
-        private MapData ConvertRowToData(int row, bool parseMap = false)
-        {
-            var file = parseMap ? AddRoot(GetMapFilePath(row)) : GetMapFilePath(row);
-            var difficulty = float.Parse(DataGrid.Rows[row].Cells[2].Value.ToString());
-            var weight = float.Parse(DataGrid.Rows[row].Cells[3].Value.ToString());
-            Qua map = null;
-
-            if (parseMap)
-            {
-                try
-                {
-                    if (file.EndsWith(".qua"))
-                        map = Qua.Parse(file);
-                    else if (file.EndsWith(".osu"))
-                        map = new OsuBeatmap(file).ToQua();
-
-                    PrintToOutput($"Map successfully parsed: {file}");
-                }
-                catch (Exception e)
-                {
-                    ErrorToOutput($"Error parsing map: {e.Message}");
-                }
-            }
-
-            return new MapData(file, difficulty, weight, map);
-        }
-
-        private List<MapData> ParseMapData(bool parseMap = false)
-        {
-            var data = new List<MapData>();
-
-            for (var row = 0; row < DataGrid.Rows.Count - 1; row++)
-            {
-                try
-                {
-                    data.Add(ConvertRowToData(row, parseMap));
-                }
-                catch
-                {
-                    // Ignored
-                }
-            }
-
-            return data;
         }
 
         private void tabPage1_Click(object sender, EventArgs e)
@@ -651,6 +686,48 @@ namespace DifficultyOptimizer
         private void ButtonCalculate_Click(object sender, EventArgs e)
         {
             ComputeForDifficulty();
+        }
+        
+        private void ButtonOptimize_Click(object sender, EventArgs e)
+        {
+            if (TokenSource != null)
+            {
+                TokenSource.Cancel();
+                return;
+            }
+
+            HandleOptimization();
+        }
+        
+        private void ButtonSetDirectory_Click(object sender, EventArgs e)
+        {
+            if (FolderBrowser.ShowDialog() != DialogResult.OK)
+            {
+                ErrorToOutput("Cancelled Root Directory setup");
+                return;
+            }
+
+            PrintToOutput($"Relative Root directory for maps has been set to: {FolderBrowser.SelectedPath}");
+            SetRootFolder(FolderBrowser.SelectedPath);
+        }
+        
+        private void ButtonImportMap_Click(object sender, EventArgs e)
+        {
+            if (FileBrowser.ShowDialog() != DialogResult.OK || !FileBrowser.CheckFileExists)
+            {
+                ErrorToOutput("Maps Import Cancelled.");
+                return;
+            }
+
+            foreach (var file in FileBrowser.FileNames)
+            {
+                TryImportMapData(file);
+            }
+        }
+        
+        private void ButtonExportData_Click(object sender, EventArgs e)
+        {
+            TryExportData();
         }
     }
 }
