@@ -39,7 +39,14 @@
             this.Output = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.TabVariables = new System.Windows.Forms.TabPage();
             this.VariableGrid = new System.Windows.Forms.DataGridView();
+            this.VCompute = new System.Windows.Forms.DataGridViewCheckBoxColumn();
+            this.VariableName = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.StartingValue = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.OptimizedValue = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.MaxValue = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.MinValue = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.splitContainer2 = new System.Windows.Forms.SplitContainer();
+            this.ButtonCalculate = new System.Windows.Forms.Button();
             this.ButtonOptimize = new System.Windows.Forms.Button();
             this.ButtonExportData = new System.Windows.Forms.Button();
             this.ButtonImportData = new System.Windows.Forms.Button();
@@ -47,13 +54,7 @@
             this.ButtonSetDirectory = new System.Windows.Forms.Button();
             this.ProgressBar = new System.Windows.Forms.ProgressBar();
             this.TextBoxOutput = new System.Windows.Forms.RichTextBox();
-            this.VCompute = new System.Windows.Forms.DataGridViewCheckBoxColumn();
-            this.VariableName = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.StartingValue = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.OptimizedValue = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.MaxValue = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.MinValue = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.ButtonCalculate = new System.Windows.Forms.Button();
+            this.ButtonUseValues = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
             this.splitContainer1.Panel2.SuspendLayout();
@@ -197,6 +198,49 @@
             this.VariableGrid.TabIndex = 0;
             this.VariableGrid.CellContentClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.VariableGrid_CellContentClick);
             // 
+            // VCompute
+            // 
+            this.VCompute.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.AllCells;
+            this.VCompute.HeaderText = "Compute";
+            this.VCompute.Name = "VCompute";
+            this.VCompute.Width = 55;
+            // 
+            // VariableName
+            // 
+            this.VariableName.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
+            this.VariableName.HeaderText = "Variable Name";
+            this.VariableName.Name = "VariableName";
+            this.VariableName.ReadOnly = true;
+            // 
+            // StartingValue
+            // 
+            this.StartingValue.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.AllCells;
+            this.StartingValue.HeaderText = "Input Value";
+            this.StartingValue.Name = "StartingValue";
+            this.StartingValue.Width = 86;
+            // 
+            // OptimizedValue
+            // 
+            this.OptimizedValue.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.AllCells;
+            this.OptimizedValue.HeaderText = "Output Value";
+            this.OptimizedValue.Name = "OptimizedValue";
+            this.OptimizedValue.ReadOnly = true;
+            this.OptimizedValue.Width = 94;
+            // 
+            // MaxValue
+            // 
+            this.MaxValue.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.AllCells;
+            this.MaxValue.HeaderText = "Max Value";
+            this.MaxValue.Name = "MaxValue";
+            this.MaxValue.Width = 82;
+            // 
+            // MinValue
+            // 
+            this.MinValue.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.AllCells;
+            this.MinValue.HeaderText = "Min Value";
+            this.MinValue.Name = "MinValue";
+            this.MinValue.Width = 79;
+            // 
             // splitContainer2
             // 
             this.splitContainer2.Dock = System.Windows.Forms.DockStyle.Fill;
@@ -205,6 +249,7 @@
             // 
             // splitContainer2.Panel1
             // 
+            this.splitContainer2.Panel1.Controls.Add(this.ButtonUseValues);
             this.splitContainer2.Panel1.Controls.Add(this.ButtonCalculate);
             this.splitContainer2.Panel1.Controls.Add(this.ButtonOptimize);
             this.splitContainer2.Panel1.Controls.Add(this.ButtonExportData);
@@ -221,6 +266,19 @@
             this.splitContainer2.Size = new System.Drawing.Size(927, 198);
             this.splitContainer2.SplitterDistance = 153;
             this.splitContainer2.TabIndex = 0;
+            // 
+            // ButtonCalculate
+            // 
+            this.ButtonCalculate.AutoSize = true;
+            this.ButtonCalculate.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.ButtonCalculate.Dock = System.Windows.Forms.DockStyle.Top;
+            this.ButtonCalculate.Location = new System.Drawing.Point(0, 115);
+            this.ButtonCalculate.Name = "ButtonCalculate";
+            this.ButtonCalculate.Size = new System.Drawing.Size(153, 23);
+            this.ButtonCalculate.TabIndex = 6;
+            this.ButtonCalculate.Text = "Compute";
+            this.ButtonCalculate.UseVisualStyleBackColor = true;
+            this.ButtonCalculate.Click += new System.EventHandler(this.ButtonCalculate_Click);
             // 
             // ButtonOptimize
             // 
@@ -311,61 +369,18 @@
             this.TextBoxOutput.TabIndex = 0;
             this.TextBoxOutput.Text = "";
             // 
-            // VCompute
+            // ButtonUseValues
             // 
-            this.VCompute.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.AllCells;
-            this.VCompute.HeaderText = "Compute";
-            this.VCompute.Name = "VCompute";
-            this.VCompute.Width = 55;
-            // 
-            // VariableName
-            // 
-            this.VariableName.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
-            this.VariableName.HeaderText = "Variable Name";
-            this.VariableName.Name = "VariableName";
-            this.VariableName.ReadOnly = true;
-            // 
-            // StartingValue
-            // 
-            this.StartingValue.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.AllCells;
-            this.StartingValue.HeaderText = "Input Value";
-            this.StartingValue.Name = "StartingValue";
-            this.StartingValue.Width = 86;
-            // 
-            // OptimizedValue
-            // 
-            this.OptimizedValue.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.AllCells;
-            this.OptimizedValue.HeaderText = "Output Value";
-            this.OptimizedValue.Name = "OptimizedValue";
-            this.OptimizedValue.ReadOnly = true;
-            this.OptimizedValue.Width = 94;
-            // 
-            // MaxValue
-            // 
-            this.MaxValue.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.AllCells;
-            this.MaxValue.HeaderText = "Max Value";
-            this.MaxValue.Name = "MaxValue";
-            this.MaxValue.Width = 82;
-            // 
-            // MinValue
-            // 
-            this.MinValue.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.AllCells;
-            this.MinValue.HeaderText = "Min Value";
-            this.MinValue.Name = "MinValue";
-            this.MinValue.Width = 79;
-            // 
-            // ButtonCalculate
-            // 
-            this.ButtonCalculate.AutoSize = true;
-            this.ButtonCalculate.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
-            this.ButtonCalculate.Dock = System.Windows.Forms.DockStyle.Top;
-            this.ButtonCalculate.Location = new System.Drawing.Point(0, 115);
-            this.ButtonCalculate.Name = "ButtonCalculate";
-            this.ButtonCalculate.Size = new System.Drawing.Size(153, 23);
-            this.ButtonCalculate.TabIndex = 6;
-            this.ButtonCalculate.Text = "Compute";
-            this.ButtonCalculate.UseVisualStyleBackColor = true;
-            this.ButtonCalculate.Click += new System.EventHandler(this.ButtonCalculate_Click);
+            this.ButtonUseValues.AutoSize = true;
+            this.ButtonUseValues.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.ButtonUseValues.Dock = System.Windows.Forms.DockStyle.Top;
+            this.ButtonUseValues.Location = new System.Drawing.Point(0, 138);
+            this.ButtonUseValues.Name = "ButtonUseValues";
+            this.ButtonUseValues.Size = new System.Drawing.Size(153, 23);
+            this.ButtonUseValues.TabIndex = 7;
+            this.ButtonUseValues.Text = "Use Optimized Values";
+            this.ButtonUseValues.UseVisualStyleBackColor = true;
+            this.ButtonUseValues.Click += new System.EventHandler(this.ButtonUseValues_Click);
             // 
             // DifficultyOptimizerForm
             // 
@@ -423,6 +438,7 @@
         private System.Windows.Forms.DataGridViewTextBoxColumn MaxValue;
         private System.Windows.Forms.DataGridViewTextBoxColumn MinValue;
         private System.Windows.Forms.Button ButtonCalculate;
+        private System.Windows.Forms.Button ButtonUseValues;
     }
 }
 

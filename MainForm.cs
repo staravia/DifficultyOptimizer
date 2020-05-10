@@ -238,6 +238,7 @@ namespace DifficultyOptimizer
             catch (OperationCanceledException)
             {
                 ErrorToOutput("Optimization Cancelled.");
+                UpdateAllConstantOutputs();
                 TokenSource = null;
             }
             catch (Exception e)
@@ -443,13 +444,19 @@ namespace DifficultyOptimizer
             TokenSource = null;
             stopwatch.Stop();
 
-            // Update constants in UI
-            for (var i = 0; i < Constants.ConstantVariables.Count; i++)
-                UpdateConstantOutput(i, Constants.ConstantVariables[i].Value);
-
             // Compute for current difficulties + update output
             GetCurrentFX(true);
+            UpdateAllConstantOutputs();
             PrintToOutput($"Done! Took {stopwatch.Elapsed.TotalSeconds} seconds to compute!");
+        }
+
+        /// <summary>
+        /// Updates all the constant outputs in the UI
+        /// </summary>
+        private void UpdateAllConstantOutputs()
+        {
+            for (var i = 0; i < Constants.ConstantVariables.Count; i++)
+                UpdateConstantOutput(i, Constants.ConstantVariables[i].Value);
         }
 
         /// <summary>
@@ -548,15 +555,15 @@ namespace DifficultyOptimizer
         /// <param name="name"></param>
         /// <param name="value"></param>
         /// <param name="optimize"></param>
-        /// <param name="max"></param>
         /// <param name="min"></param>
-        private void TryImportConstantData(string name, float value, bool optimize = true, float min = 0)
+        /// <param name="max"></param>
+        private void TryImportConstantData(string name, float value, bool optimize = true, float min = 0.05f, float max = -1)
         {
             var row = (DataGridViewRow)VariableGrid.Rows[0].Clone();
             row.Cells[1].Value = name;
             row.Cells[2].Value = value;
             row.Cells[0].Value = optimize;
-            row.Cells[4].Value = value * 2f + 5;
+            row.Cells[4].Value = max < 0 ? value * 2f + 5 : max;
             row.Cells[5].Value = min;
             VariableGrid.Rows.Add(row);
         }
@@ -791,5 +798,16 @@ namespace DifficultyOptimizer
         }
         
         private void ButtonExportData_Click(object sender, EventArgs e) => TryExportData();
+
+        private void ButtonUseValues_Click(object sender, EventArgs e)
+        {
+            for (var i = 0; i < Constants.ConstantVariables.Count; i++)
+            {
+                if (! (bool) VariableGrid.Rows[i].Cells[0].Value)
+                    continue;
+                
+                VariableGrid.Rows[i].Cells[2].Value = VariableGrid.Rows[i].Cells[3].Value;
+            }
+        }
     }
 }
