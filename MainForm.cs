@@ -8,14 +8,9 @@ using Quaver.API.Maps.Parsers;
 using Quaver.API.Maps.Processors.Difficulty.Rulesets.Keys;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -24,14 +19,46 @@ namespace DifficultyOptimizer
 {
     public partial class DifficultyOptimizerForm : Form
     {
+        /// <summary>
+        /// The root folder of our reference maps.
+        /// </summary>
         private string RootFolder { get; set; }
 
-        private string CurrentDirectory { get; set; }
+        /// <summary>
+        /// The directory of this application.
+        /// </summary>
+        private string CurrentDirectory { get; }
 
+        /// <summary>
+        /// Used to import files.
+        /// </summary>
         private OpenFileDialog FileBrowser = new OpenFileDialog();
 
+        /// <summary>
+        /// Used to reference the current directory.
+        /// </summary>
         private FolderBrowserDialog FolderBrowser = new FolderBrowserDialog();
 
+        /// <summary>
+        /// 
+        /// </summary>
+        private StrainConstantsKeys Constants { get; set; }
+        
+        /// <summary>
+        /// 
+        /// </summary>
+        private List<MapData> MapData { get; set; }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        private CancellationTokenSource TokenSource { get; set; }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        private NelderMead Solver { get; }
+        
         private string RemoveRoot(string file) => file.Replace(RootFolder, ".");
 
         private string AddRoot(string file) => RootFolder + file.Substring(1);
@@ -39,15 +66,6 @@ namespace DifficultyOptimizer
         private void DeleteRow(int row) => DataGrid.Rows.RemoveAt(row);
 
         private bool ValidateRow(int row) => File.Exists(AddRoot(GetMapFilePath(row)));
-        
-        private StrainConstantsKeys Constants;
-        private List<MapData> MapData;
-
-        private CancellationTokenSource TokenSource;
-
-        private NelderMead Solver;
-
-        private int StepCount;
         private event EventHandler<string> OptimizeStepComplete;
 
         public DifficultyOptimizerForm()
@@ -63,10 +81,20 @@ namespace DifficultyOptimizer
             Constants = new StrainConstantsKeys();
             foreach (var constant in Constants.ConstantVariables)
                 ImportConstantData(constant.Name, constant.Value);
-
+            
             VariableGrid.AllowUserToAddRows = false;
             VariableGrid.AllowUserToDeleteRows = false;
             OptimizeStepComplete += OnOptimizeStepComplete;
+            
+            // Create Nelder Mead Solver
+            Solver = new NelderMead(Constants.ConstantVariables.Count, GetOptimizedValue)
+            {
+                Convergence = new GeneralConvergence(Constants.ConstantVariables.Count)
+                {
+                    Evaluations = 0, 
+                    MaximumEvaluations = 100000
+                }
+            };
         }
 
         private void CheckForLocalJson()
@@ -158,6 +186,7 @@ namespace DifficultyOptimizer
             // Update MapData List
             TokenSource = new CancellationTokenSource();
             MapData = ParseMapData(true);
+            UpdateSolver();
 
             if (MapData.Count == 0)
             {
@@ -174,36 +203,6 @@ namespace DifficultyOptimizer
             // Create Stopwatch
             var stopwatch = new Stopwatch();
             stopwatch.Start();
-
-            // Create Nelder Mead Solver
-            Solver = new NelderMead(Constants.ConstantVariables.Count, GetOptimizedValue)
-            {
-                Token = TokenSource.Token,
-                
-                Convergence = new GeneralConvergence(Constants.ConstantVariables.Count)
-                {
-                    Evaluations = 0, 
-                    MaximumEvaluations = 100000
-                }
-            };
-
-            // Set Lower bounds
-            for (var i = 0; i < Solver.LowerBounds.Length; i++)
-            {
-                float val;
-
-                if (float.TryParse(Convert.ToString(VariableGrid.Rows[i].Cells[5].Value), out val))
-                    Solver.LowerBounds[i] = val;
-            }
-            
-            // Set Upper bounds
-            for (var i = 0; i < Solver.LowerBounds.Length; i++)
-            {
-                float val;
-
-                if (float.TryParse(Convert.ToString(VariableGrid.Rows[i].Cells[4].Value), out val))
-                    Solver.UpperBounds[i] = val;
-            }
 
             // Solve
             try
@@ -224,6 +223,32 @@ namespace DifficultyOptimizer
             finally
             {
                 TokenSource = null;
+            }
+        }
+
+        /// <summary>
+        /// </summary>
+        private void UpdateSolver()
+        {
+            // Update Cancellation Token
+            Solver.Token = TokenSource.Token;
+            
+            // Set Lower bounds
+            for (var i = 0; i < Solver.LowerBounds.Length; i++)
+            {
+                float val;
+
+                if (float.TryParse(Convert.ToString(VariableGrid.Rows[i].Cells[5].Value), out val))
+                    Solver.LowerBounds[i] = val;
+            }
+            
+            // Set Upper bounds
+            for (var i = 0; i < Solver.LowerBounds.Length; i++)
+            {
+                float val;
+
+                if (float.TryParse(Convert.ToString(VariableGrid.Rows[i].Cells[4].Value), out val))
+                    Solver.UpperBounds[i] = val;
             }
         }
 
@@ -283,7 +308,7 @@ namespace DifficultyOptimizer
         private void OnOptimizeStepComplete(object sender, string output)
         {
             PrintToOutput(output);
-            ProgressBar.Value = (int)(100 * StepCount / (float)Solver.Convergence.MaximumEvaluations);
+            ProgressBar.Value = (int)(100 * Solver.Convergence.Evaluations / (float)Solver.Convergence.MaximumEvaluations);
         }
 
         /// <summary>
