@@ -485,9 +485,27 @@ namespace DifficultyOptimizer
             stopwatch.Stop();
 
             // Compute for current difficulties + update output
-            GetCurrentFX(true);
             UpdateAllConstantOutputs();
+            PrintCodeToOutput();
+            GetCurrentFX(true);
             PrintToOutput($"Done! Took {stopwatch.Elapsed.TotalSeconds} seconds to compute!");
+        }
+
+        /// <summary>
+        /// This will print stuff to the output that you can copy+paste into the API code
+        /// </summary>
+        private void PrintCodeToOutput()
+        {
+            PrintToOutput("-----------------------");
+            
+            for (var i = 0; i < VariableGrid.Rows.Count; i++)
+            {
+                var extra = i < VariableGrid.Rows.Count - 1 ? "," : "";
+                PrintToOutput($"new ConstantVariable(\"{VariableGrid.Rows[i].Cells[1].Value}\", {VariableGrid.Rows[i].Cells[3].Value}f){extra}");   
+            }
+            
+            PrintToOutput("-----------------------");
+
         }
 
         /// <summary>
