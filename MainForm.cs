@@ -388,7 +388,7 @@ namespace DifficultyOptimizer
                 Convergence = new GeneralConvergence(count)
                 {
                     Evaluations = 0, 
-                    MaximumEvaluations = 700
+                    MaximumEvaluations = 200
                 },
                 
                 Token = TokenSource.Token
