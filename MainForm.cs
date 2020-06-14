@@ -524,8 +524,9 @@ namespace DifficultyOptimizer
         {
             if (MapData == null)
                 MapData = ParseAllMapData(true);
-            
+
             UpdateConstants(ParseConstantsInput(false), false);
+            PrintCodeToOutput();
             GetCurrentFX(true);
         }
 
